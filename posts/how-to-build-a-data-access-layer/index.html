@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Build a Data Access Layer | 📡 The Chris Frequency</title>
+    <link rel="stylesheet" href="/assets/style.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="/" class="">Home</a>
+                <a href="/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="/posts/introduction" rel="prev">
+                    <span class="meta-nav">&larr;</span> Introduction
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="/posts/sqlite-secret-weapon" rel="next">
+                    SQLite: A Secret Weapon <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>How to Build a Data Access Layer</h1>
+        <p class="post-meta">
+            <time datetime="2025-07-26">
+                July 26, 2025
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>As a technical system grows in scale and complexity, teams require more checks, balances, and standards to keep development manageable and maintain delivery velocity. While practices like feature flags and contract testing are common at this stage, one technique is often considered too late in the development cycle: a solid data access layer.</p>
+<p>Without a formally defined data access layer, data access becomes ad-hoc. It often relies on rapid application development frameworks, direct use of object-relational mappers (ORMs), or database queries embedded directly in application code.</p>
+<p>While this approach may be acceptable in small systems where outgrowing a single database is unlikely, it becomes a significant problem for systems that need to scale. As we shall see, these ad-hoc patterns limit flexibility, are difficult to test, and become hard to reason about in the long term.</p>
+<p><em>Code examples are in typed Python, but the principles apply to any language.</em></p>
+<h2>A typical example</h2>
+<p>Firstly, as a counterpoint to the intended pattern, we will use the typical rapid application development staple of the <a href="https://en.wikipedia.org/wiki/Active_record_pattern?ref=ghost.ivxs.uk">Active Record pattern</a> being called directly in application code as an example in this context.</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">BlogComment</span><span class="p">:</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">post_id</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">comment</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">db</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">post_id</span> <span class="o">=</span> <span class="n">post_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">username</span> <span class="o">=</span> <span class="n">username</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comment</span> <span class="o">=</span> <span class="n">comment</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">username</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">username</span>
+        <span class="n">comment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">comment</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;blog_comment&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">comment</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">post</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">post_id</span><span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;blog_post&quot;</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">BlogComment</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query_many</span><span class="p">(</span><span class="s2">&quot;blog_comment&quot;</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+</pre></div>
+<p>Note that real ORMs are far more sophisticated than this, but the interface is essentially the same. We include a few common Active Record patterns here, such as:</p>
+<ol>
+<li>Object properties (such as <code>id</code> and <code>username</code>) that can be modified at any time.</li>
+<li>A <code>save</code> method that modifies the database.</li>
+<li>A <code>post</code> property that does a database query under the bonnet.</li>
+<li>A <code>query</code> method where the function caller may specify ORM parameters.</li>
+</ol>
+<p>This style limits the resulting application's data code's flexibility, testability and ease of future refactorings.</p>
+<p>We will expand on the reasons why in the following sections.</p>
+<p><em>This article is neutral on the usefulness (in general) of ORMs. It should be noted that use of ORMs can be a very good idea in some circumstances, when hidden behind a properly defined data access layer, and regarded as an implementation detail.</em></p>
+<h3>Unpredictable queries</h3>
+<p>The <code>query</code> class method exposes the <code>params</code> parameter, which allows for any kind of filter to be specified in the application code. Think of Java's Hibernate Query Language (HQL), Django's keyword argument filters, or the equivalent in your ORM of choice.</p>
+<p>This feature creates a <a href="https://www.joelonsoftware.com/2002/11/11/the-law-of-leaky-abstractions/?ref=ghost.ivxs.uk">leaky abstraction</a>, where database specifics must be reasoned about in your application. You cannot know what conditions, joins (in the case of SQL databases), and other filters are being applied at query time.</p>
+<p>For example, we could join across ten tables without knowing it, as this logic is scattered throughout the application.</p>
+<p>This makes it very difficult to modify the data access layer without a codebase-wide search, and it violates the principle of separation of concerns.</p>
+<h3>Hard to mock, fake and test</h3>
+<p>We have to call the class methods of <code>BlogComment</code> in our application code to access the underlying database, and the <code>post</code> property secretly queries the database to provide a &quot;seamless web of objects&quot; experience to the developer.</p>
+<p>Such an interface can make it difficult to create mocks and fakes for these model objects, which can easily break when we change the application code. Even worse, we have to anticipate the incoming queries to the <code>query</code> method, which introduces significant fragility into our unit tests. We can expect a cascade of test failures if we change the filters and queries in the application.</p>
+<h2>A Better Way: The Provider Pattern</h2>
+<p>All data should be modelled as basic, immutable “plain-old python objects” (POPOs), “plain-old Java objects” (POJOs or record classes in newer versions of Java), and other POxOs, with the following properties:</p>
+<ul>
+<li>Properties must <strong>not</strong> be mutable or changeable by application code.</li>
+<li>Models must <strong>not</strong> contain embedded or &quot;secret&quot; queries.</li>
+<li>Models may contain other model objects either directly or in immutable collections.</li>
+</ul>
+<p>The above conditions more or less completely rule out ActiveRecord-style objects.</p>
+<h3>Create a well defined data interface</h3>
+<p>All data must be accessible only via a well-defined data interface with the following properties:</p>
+<ul>
+<li>It accepts only domain-specific, immutable model types* or other immutable objects, either individually or in collections as function arguments.</li>
+<li>It returns only domain-specific, immutable data types* or other immutable objects, either individually or in collections as return types.</li>
+<li>It can have more than one implementation, such as a SQL database and a fake implementation that can be used interchangeably from a correctness point of view.</li>
+</ul>
+<p>* Some exceptions are possible, such as simple, domain-specific search criteria objects or data transfer objects in the case of complex atomic writes.</p>
+<h3>Dependency injection</h3>
+<p>All application code must be able to accept any concrete implementation of the data access interface, via formal or informal dependency injection.</p>
+<p>Typically, we can either use a dependency injection framework, or we can simply pass the concrete implementation of the data access layer to the application code when the application is initialised, e.g:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="n">blog_post_provider</span> <span class="o">=</span> <span class="n">SQLBlogPostProvider</span><span class="p">()</span>
+    <span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">blog_post_provider</span><span class="p">)</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">listen</span><span class="p">(</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="mi">80</span><span class="p">)</span>
+</pre></div>
+<p>This practice in general, has many <a href="https://cult.honeypot.io/reads/5-reasons-to-use-dependency-injection-in-your-code/">benefits</a> beyond data access layers, as it enables clean code, makes unit testing much easier, provides a nice framework for separating concerns and centralises code configuration in one place.</p>
+<h2>A good example</h2>
+<p>An example of immutable model objects and data interfaces without any unexpected behaviour is as follows:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">BlogComment</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">UUID</span>
+    <span class="n">username</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">comment</span><span class="p">:</span> <span class="nb">str</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">BlogPost</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">UUID</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">content</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">username</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">comments</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">BlogComment</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">BlogPostProvider</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BlogPost</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_for_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">BlogPost</span><span class="p">]:</span>
+        <span class="k">pass</span>
+    
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_post</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">post</span><span class="p">:</span> <span class="n">BlogPost</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_comment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">post_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">,</span> <span class="n">comment</span><span class="p">:</span> <span class="n">BlogComment</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SQLBlogPostProvider</span><span class="p">(</span><span class="n">BlogPostProvider</span><span class="p">):</span>
+    <span class="k">pass</span>  <span class="c1"># implementation omitted</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">FakeBlogPostProvider</span><span class="p">(</span><span class="n">BlogPostProvider</span><span class="p">):</span>
+    <span class="k">pass</span>  <span class="c1"># implementation omitted</span>
+</pre></div>
+<p>Note that the providers can use any technology to fulfil the interface contract, and can connect to any kind of SQL or NoSQL database using direct queries, ORMs, or any other framework.</p>
+<p>We can then inject the concrete provider implementations in place of the interface in application code, and use this to consume and update data in the application, with the following benefits:</p>
+<h2>The Benefits</h2>
+<h3>Ease of unit testing</h3>
+<p>We can easily mock the provider or create a feature-complete in-memory fake version (as hinted at in the code above) for use in unit tests. This implementation can conform completely to the interface, giving us a robust set of artefacts for testing that will not need updating if we decide to change filters or other code in the application.</p>
+<h3>Ease of integration testing</h3>
+<p>We can test our data access provider separately from the application during integration tests and be confident of its correct function in production.</p>
+<p>This neatly bounds the blast-radius of integration tests, and gives us much better &quot;bang for buck&quot; for our combined unit and integration test suites.</p>
+<h3>Enhanced ability to refactor</h3>
+<p>We can at any point add properties to the model objects, create alternative domain models and smoothly migrate application and data access code from one set of models to another.</p>
+<p>One scenario that occurs in scaling companies is the need to move to an entirely new data storage technology (such as moving from a SQL database to a different kind of system). We can achieve this with minimal effort by replacing the provider implementation with a new version based on the new data store.</p>
+<h3>Possibility of live data store migration</h3>
+<p>If we adhere to these principles, it is even possible to achieve full migration from one datastore to another with no downtime whatsoever by creating a proxy provider that reads and writes from old and new providers:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MigrationProxyBlogPostProvider</span><span class="p">(</span><span class="n">BlogPostProvider</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">old</span><span class="p">:</span> <span class="n">BlogPostProvider</span><span class="p">,</span>
+            <span class="n">new</span><span class="p">:</span> <span class="n">BlogPostProvider</span><span class="p">,</span>
+            <span class="n">read_from_new</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old</span> <span class="o">=</span> <span class="n">old</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_new</span> <span class="o">=</span> <span class="n">new</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read_from_new</span> <span class="o">=</span> <span class="n">read_from_new</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BlogPost</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">read_from_new</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_new</span><span class="o">.</span><span class="n">get_one</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old</span><span class="o">.</span><span class="n">get_one</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_for_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">BlogPost</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">read_from_new</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_new</span><span class="o">.</span><span class="n">get_for_user</span><span class="p">(</span><span class="n">username</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old</span><span class="o">.</span><span class="n">get_for_user</span><span class="p">(</span><span class="n">username</span><span class="p">)</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_post</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">post</span><span class="p">:</span> <span class="n">BlogPost</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old</span><span class="o">.</span><span class="n">submit_post</span><span class="p">(</span><span class="n">post</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_new</span><span class="o">.</span><span class="n">submit_post</span><span class="p">(</span><span class="n">post</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_comment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">post_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">,</span> <span class="n">comment</span><span class="p">:</span> <span class="n">BlogComment</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old</span><span class="o">.</span><span class="n">submit_comment</span><span class="p">(</span><span class="n">post_id</span><span class="p">,</span> <span class="n">comment</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_new</span><span class="o">.</span><span class="n">submit_comment</span><span class="p">(</span><span class="n">post_id</span><span class="p">,</span> <span class="n">comment</span><span class="p">)</span>
+</pre></div>
+<p>We can use this proxy store to implement the interface in application code, the sequence of deployment / migration steps is as follows:</p>
+<ol>
+<li>Write to old provider only (pre-migration).</li>
+<li>Write to both old and new providers, read from old.</li>
+<li>Backfill missing data from new datastore from old datastore until all data migrated.</li>
+<li>Write to both old and new providers, read from new.</li>
+<li>Write to new provider only (migration complete).</li>
+</ol>
+<p>This allows a full migration from one datastore to another, assuming we can deploy services without downtime using Kubernetes or similar orchestration systems.</p>
+<p>A real benefit in mission-critical systems!</p>
+<h2>The Investment: Acknowledging the Upfront Cost</h2>
+<p>The pattern described above is not the path of least resistance. Frameworks that champion the Active Record pattern do so because it offers the seductive illusion of speed. A few commands can generate a model, and you can immediately start creating, reading, and updating records anywhere in your application.</p>
+<p>This initial velocity, however, is a form of <strong>technical debt</strong>. The pain doesn't come from a single bad decision, but from a thousand small, seemingly harmless ones. Each time a developer writes <code>User.find_by(...)</code> directly in a controller, they weave the application logic and the database schema a little tighter. This is a slow death by a thousand cuts, leading to a system where:</p>
+<ul>
+<li>Engineers fear changing a database column because they can't predict what will break.</li>
+<li>Unit tests become a tangled mess of mocks for a database you can't control.</li>
+<li>Performance bottlenecks appear because a &quot;simple&quot; property access is secretly firing off N+1 queries.</li>
+</ul>
+<p>The approach advocated here requires <strong>more discipline</strong>. It's an upfront investment in <strong>technical wealth</strong>. You write more code initially—defining interfaces, creating immutable models, and implementing providers. The payoff is a system that is decoupled, predictable, and built to last. It's a conscious choice to trade short-term convenience for long-term maintainability and peace of mind.</p>
+<h3>The True Power of Immutability</h3>
+<p>A core part of this investment is the principle of immutability. When a mutable object is passed around an application, any part of that application can change its state at any time, creating hidden side effects that are incredibly difficult to debug.</p>
+<p>An immutable model, combined with a data provider that returns <em>new</em> instances of that model upon change, makes the flow of data explicit and predictable. You know exactly where and when data changes, because it can only happen through the well-defined interface of your provider. This isn't just a &quot;nice to have&quot;; it's a fundamental principle for building systems you can reason about.</p>
+<h2>Conclusion</h2>
+<p>The choice between an ad-hoc data access pattern and a disciplined one is not a technical detail; it's a strategic decision about the kind of system you want to build. While the initial convenience of patterns like Active Record is tempting, the long-term cost in complexity, fragility, and fear of change is immense.</p>
+<p>By investing in a well-defined data access layer with immutable models, you are buying future flexibility. You are creating a system that can be tested with confidence, refactored without fear, and scaled to meet new challenges. This is a very valuable property for any fast-moving, rapidly scaling organisation. For example, at ComplyAdvantage, this approach has been critical in managing growth and complexity.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="/posts/introduction" rel="prev">
+                    <span class="meta-nav">&larr;</span> Introduction
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="/posts/sqlite-secret-weapon" rel="next">
+                    SQLite: A Secret Weapon <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+</article>
+
+
+            
+            <div class="post-credits">
+                Co-authored with
+                Gemini <span class="pathway-glyph">(💡→🤝→📝→🌐)</span>
+            </div>
+            
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2025 Chris Leow. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>

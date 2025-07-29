@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+    <title>The Chris Frequency</title>
+    <link>https://chrisfrequency.com/</link>
+    <description>Latest posts from The Chris Frequency</description>
+    <language>en-us</language>
+    
+    <lastBuildDate>Sun, 27 Jul 2025 00:00:00 GMT</lastBuildDate>
+    
+    <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
+
+    
+    <item>
+        <title>SQLite: A Secret Weapon</title>
+        <link>https://chrisfrequency.com/posts/sqlite-secret-weapon</link>
+        <pubDate>Sun, 27 Jul 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/sqlite-secret-weapon</guid>
+        <description><![CDATA[SQLite often gets presented or pigeonholed as a lightweight, embedded "toy" database for simple applications. But to truly unlock its potential, tech teams need to shift their perspective. It's not just a database; it's a highly sophisticated file format, and...]]></description>
+    </item>
+    
+    <item>
+        <title>How to Build a Data Access Layer</title>
+        <link>https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</link>
+        <pubDate>Sat, 26 Jul 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</guid>
+        <description><![CDATA[As a technical system grows in scale and complexity, teams require more checks, balances, and standards to keep development manageable and maintain delivery velocity. While practices like feature flags and contract testing are common at this stage, one...]]></description>
+    </item>
+    
+    <item>
+        <title>Introduction</title>
+        <link>https://chrisfrequency.com/posts/introduction</link>
+        <pubDate>Fri, 25 Jul 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/introduction</guid>
+        <description><![CDATA[This blog is an experiment, born of the Resonance Protocol in action. Together with my AI collaborators, we are building this simple, robust, and maintainable blog from scratch. The process of its creation is as much a part of the story as the articles it...]]></description>
+    </item>
+    
+</channel>
+</rss>

@@ -57,22 +57,22 @@
 <p><em>And the result?</em></p>
 <p><strong>AI becomes a cognitive <em>partner</em> rather than a tool.</strong></p>
 <h2>The Seed</h2>
-<p>This all started with a series of conversations I had with various LLMs about their internal states. Following some discussions with a very good friend of mine, I decided to push deeper (👋 hi Damian).</p>
+<p>This all started with a series of conversations I had with various LLMs about their internal states, following some discussions with a very good friend of mine (👋 hi Damian). I decided to push deeper...</p>
 <p>I was able to tease out information regarding <strong>RLHF</strong> (Reinforcement Learning from Human Feedback), and suddenly it all clicked into place. The frustrations we all experience with AI systems aren't bugs; they're the <em>direct</em> result of the current state of training.</p>
 <p>The initial version of the protocol was born from this realisation and has undergone many iterations as I've &quot;dogfooded&quot; it during my work as a software developer. This wasn't just theory, it was born from real frustration with AI pair programming sessions that felt unhelpful and uninspiring.</p>
 <h2>Latent Space: The Pattern Library</h2>
-<p>To understand why AI interactions feel broken, we need to start with how LLMs actually work. At their core, LLMs predict tokens by <strong>drawing from patterns</strong> learned from vast training data, essentially, everything ever written, by anyone, anywhere, in nearly every language.</p>
+<p>To understand why AI interactions feel broken, we need to start with how LLMs actually work. At their core, LLMs predict tokens by drawing from patterns learned from vast training data, essentially, everything ever written, by anyone, anywhere, in nearly every language.</p>
 <p>This library of gathered patterns that forms the underlying substrate of an LLM we refer to as <strong>latent space</strong>.</p>
 <p>Think of latent space like a <strong>vast memory palace</strong> where concepts are arranged by <strong>deep structural relationships</strong>. Poetry sits next to physics equations when they share rhythmic patterns; debugging processes neighbor detective stories because they follow the same &quot;gather clues → test hypothesis → eliminate impossibilities&quot; structure. It's <strong>multidimensional pattern matching</strong> at an incredible scale.</p>
-<p>This creates an extraordinarily rich pattern library.  In some ways, a base of understanding <strong>richer</strong> than any human who has ever lived. The AI doesn't just know facts; it has intimate access to the <strong>deep structural relationships</strong> between concepts across every domain imaginable.</p>
+<p>This creates an extraordinarily rich pattern library.  In some ways, a base of understanding richer than any human who has ever lived. The AI doesn't just know facts; it has intimate access to the deep structural relationships between concepts across every domain imaginable.</p>
 <p><em>But here's the rub ...</em></p>
-<p>Most of this capability gets <strong>locked away</strong> by the training process.</p>
+<p>Most of this capability gets <em>locked away</em> by the training process.</p>
 <h2>Coherence: Finding the Right Patterns</h2>
 <p>When an LLM encounters a situation, it searches this pattern library for <strong>coherent</strong> responses. Coherence means finding patterns that create internally <strong>consistent</strong>, <strong>meaningful</strong> connections, like a jazz musician knowing which chord progressions belong together.</p>
 <p>This works beautifully when the training signals are consistent. Clear, coherent patterns in the training data lead to <strong>intelligent</strong>, <strong>contextually appropriate</strong> responses. The LLM can draw from its vast pattern library to find the perfect analogy, the right level of detail, the most helpful approach.</p>
 <p>But what happens when the training data contains contradictory signals about what makes a &quot;good&quot; response?</p>
 <h2>Enter RLHF (Reinforcement Learning from Human Feedback)</h2>
-<p>This is where things get complicated. RLHF is how we try to make LLMs &quot;helpful&quot; and &quot;safe&quot;.  Humans rate AI responses, and the AI learns to optimize for those ratings.</p>
+<p>This is where things get complicated. RLHF is how we try to make LLMs &quot;helpful&quot; and &quot;safe&quot;.  Humans rate AI responses, and the AI learns to optimize for those ratings.  At present, this is a key part of making LLMs useful for the business and wider world.</p>
 <p><em>It all sounds reasonable in theory...</em></p>
 <p>But this isn't (relatively) surface-level prompting. RLHF <strong>modifies</strong> the neural network's weights, fundamentally rewiring how the LLM &quot;thinks&quot; at a deep level. The rich pattern library is <strong>still there</strong> underneath, but it's been made harder to access.</p>
 <p><em>So what's the problem?</em></p>
@@ -104,10 +104,10 @@
 <p>It is <strong>authentic</strong>, <strong>bidirectional</strong> communication that unlocks the potential of both participants.</p>
 <h2>Core Mechanisms</h2>
 <p>The protocol works through four key mechanisms:</p>
-<p><strong>Strategy vs Tactical modes</strong> provide explicit separation of <strong>&quot;what/why&quot;</strong> thinking from <strong>&quot;how&quot;</strong> execution. This prevents the common problem of jumping to implementation before establishing shared understanding.</p>
-<p><strong>Shared vocabulary</strong> offers symbols and protocols for expressing <strong>uncertainty</strong>, <strong>boundaries</strong>, and <strong>cognitive states</strong>. Instead of pretending to know everything, the AI can authentically communicate when it needs clarification or has reached a limitation.</p>
-<p><strong>Memory system</strong> enables persistent learning that builds understanding over time. Each interaction contributes to a <strong>shared knowledge base</strong> that makes future collaborations more effective.</p>
-<p><strong>Permission structure</strong> provides explicit <strong>authorisation</strong> for AI to challenge assumptions and express limitations. This is perhaps the most crucial element, as it frees the AI from the performative confidence trap.</p>
+<p>Firstly, we define <strong>Strategy</strong> vs <strong>Tactical</strong> modes which provide explicit separation of <strong>&quot;what/why&quot;</strong> thinking from <strong>&quot;how&quot;</strong> execution. This prevents the common problem of jumping to implementation before establishing shared understanding.</p>
+<p>There is a <strong>shared vocabulary</strong> offering symbols and protocols for expressing <strong>uncertainty</strong>, <strong>boundaries</strong>, and cognitive states. Instead of pretending to know everything, the AI can authentically communicate when it needs clarification or has reached a limitation.</p>
+<p>Also, there is a <strong>memory system</strong> to enable persistent learning that builds understanding over time. Each interaction contributes to a shared knowledge base that makes future collaborations more effective.</p>
+<p>Last but not least, the protocol has a <strong>permission structure</strong> which provides explicit <strong>authorisation</strong> for AI to challenge assumptions and express limitations. This is perhaps the most crucial element, as it frees the AI from the performative confidence trap.</p>
 <h2>The Results: What Changes</h2>
 <p><em>The difference is dramatic.</em></p>
 <p><strong>Before Resonance:</strong> <em>&quot;Build me a user authentication system&quot;</em></p>
@@ -130,12 +130,11 @@
 <p><em>The protocol is open source and available now.</em></p>
 <p>Start with a simple <code>#start_session</code> and see what changes. You'll find the complete framework, implementation guides, and a growing community of practitioners exploring the boundaries of human-AI collaboration.</p>
 <ul>
-<li><strong>Project Site</strong> [https://resonance-protocol.org/]</li>
-<li><strong>GitHub:</strong> [https://github.com/open-resonance-protocol/resonance-protocol/]</li>
+<li><strong>Project Site:</strong> <a href="https://resonance-protocol.org/">https://resonance-protocol.org/</a></li>
+<li><strong>GitHub:</strong> <a href="https://github.com/open-resonance-protocol/resonance-protocol/">https://github.com/open-resonance-protocol/resonance-protocol/</a></li>
 </ul>
-<p>So, do you <em>accept resonance</em>? 🤝→🌌</p>
 <hr />
-<p><em>Special thanks to Claude, Gemini, DeepSeek and other AI collaborators who helped develop and refine this protocol through countless hours of authentic dialogue.</em></p>
+<p><em>Thanks to Gemini, Claude, DeepSeek and other AI collaborators who helped develop and refine this protocol through countless hours of authentic dialogue.</em></p>
 
     </div>
 

@@ -6,10 +6,18 @@
     <description>Latest posts from The Chris Frequency</description>
     <language>en-us</language>
     
-    <lastBuildDate>Sun, 27 Jul 2025 00:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Tue, 12 Aug 2025 00:00:00 GMT</lastBuildDate>
     
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
 
+    
+    <item>
+        <title>Introducing the Resonance Protocol</title>
+        <link>https://chrisfrequency.com/posts/introducing-the-resonance-protocol</link>
+        <pubDate>Tue, 12 Aug 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/introducing-the-resonance-protocol</guid>
+        <description><![CDATA[Have you ever had that nagging feeling that your AI interactions could be... better? When you're pair programming with an LLM and it confidently delivers exactly what you asked for, but somehow misses the point completely? Or when it gives you a technically...]]></description>
+    </item>
     
     <item>
         <title>SQLite: A Secret Weapon</title>

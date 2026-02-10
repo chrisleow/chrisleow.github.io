@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scalability is a Function of Your Data Layer | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/scalability-your-data-layer">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/introducing-the-resonance-protocol" rel="prev">
+                    <span class="meta-nav">&larr;</span> Introducing the Resonance Protocol
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Scalability is a Function of Your Data Layer</h1>
+        <p class="post-meta">
+            <time datetime="2026-02-10">
+                February 10, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <h2>Introduction</h2>
+<p>The modern scaling landscape is overwhelming. Queues, event buses, microservices, serverless, Kubernetes. The list of &quot;essential&quot; technologies grows longer every year. It's very easy to get lost in the choices, and even easier to feel pressure to adopt whatever patterns are currently deemed &quot;industry standard&quot;. Everyone else seems to be doing it, so it must be right.</p>
+<p>Right?</p>
+<h3>The Stack Overflow Anomaly</h3>
+<p>Consider Stack Overflow. For over a decade, they debugged the world's software problems using <a href="https://nickcraver.com/blog/2016/02/17/stack-overflow-the-architecture-2016-edition/">a handful of servers</a> and a surprisingly simple architecture. No microservices. No event sourcing. No exotic databases. Just a well-designed system built on proven, boring technology that scaled to tens of millions of users.</p>
+<p>How did they achieve this? And more importantly, why does their approach feel like such an anomaly in today's architecture discussions?</p>
+<h3>The Danger Zone</h3>
+<p>The answer lies in understanding a critical but often overlooked danger zone: the space between <strong>over-optimisation</strong> and <strong>under-optimisation</strong>.</p>
+<p><strong>Over-optimise</strong> too early, and you'll drown in premature complexity, vendor lock-in, and crushing cognitive overhead. Your team will spend more time wrestling with distributed systems than building features.</p>
+<p><strong>Under-optimise</strong>, and you'll build fragile and ad-hoc architectures that buckle under the first real load, forcing expensive rewrites that could have been avoided.</p>
+<p>There's a third trap worth naming: <strong>&quot;career-driven development&quot;</strong>. We've all seen it ... the choice to adopt a hot new technology not because it solves a real problem, but because it looks good on LinkedIn. These decisions are costly, and they're more common than we'd like to admit.</p>
+<h3>A Different Path</h3>
+<p>This article offers a different path. It distills the practical, essential essence of scaling down to a framework you can actually use: <strong>a pathway that works now and evolves with you</strong>, focusing on the decisions that matter whilst deferring those that don't.</p>
+<p>It's not about picking the perfect technology stack upfront. It's about building systems that give you the freedom to make those choices later, when the constraints are clear and the costs are justified.</p>
+<p>The secret? <strong>Your data layer</strong>.</p>
+<hr />
+<h2>Data Modelling: The Foundation</h2>
+<p>Data modelling is often treated as an &quot;also-ran&quot; in system design; something rushed through in favour of picking databases and frameworks. Yet it's arguably <strong>the most important architectural decision you'll make</strong>. Get the domain model right, and everything else becomes easier. Get it wrong, and you'll spend years fighting technical debt.</p>
+<h3>Storage-Agnostic Design</h3>
+<p>The key principle is deceptively simple: <strong>model the business problem first</strong>.</p>
+<ul>
+<li>Create types that represent meaningful domain concepts</li>
+<li>Think in terms of entities, relationships, and operations</li>
+<li><strong>Critically: Don't think about storage yet</strong></li>
+</ul>
+<p>That decision comes later, once you understand how these models will actually be used.</p>
+<h3>Keep It Simple</h3>
+<p>This approach draws from Domain-Driven Design, but in simplified form:</p>
+<ul>
+<li><strong>Clear types</strong>: Models should clearly refer to meaningful types within your system</li>
+<li><strong>Extendable but not complex</strong>: They should grow without becoming over-engineered</li>
+<li><strong>Business-aligned</strong>: Focus on clarity and business alignment, not database schemas</li>
+</ul>
+<p>Consider a simple e-commerce system. Here's what storage-agnostic domain modelling looks like:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Product</span><span class="p">:</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">ProductId</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">string</span>
+    <span class="n">price</span><span class="p">:</span> <span class="n">Money</span>
+    <span class="n">inventory_count</span><span class="p">:</span> <span class="nb">int</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Order</span><span class="p">:</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">OrderId</span>
+    <span class="n">customer</span><span class="p">:</span> <span class="n">Customer</span>
+    <span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">OrderItem</span><span class="p">]</span>
+    <span class="n">total</span><span class="p">:</span> <span class="n">Money</span>
+    <span class="n">status</span><span class="p">:</span> <span class="n">OrderStatus</span>  <span class="c1"># PENDING, CONFIRMED, SHIPPED, DELIVERED</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Customer</span><span class="p">:</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">CustomerId</span>
+    <span class="n">email</span><span class="p">:</span> <span class="n">string</span>
+    <span class="n">shipping_addresses</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Address</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderItem</span><span class="p">:</span>
+    <span class="n">product</span><span class="p">:</span> <span class="n">Product</span>
+    <span class="n">quantity</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">price_at_purchase</span><span class="p">:</span> <span class="n">Money</span>  <span class="c1"># Capture historical pricing</span>
+</pre></div>
+<p>Notice what's missing: no database fields, no <code>save()</code> methods, no ORM annotations. Just clean domain concepts that model the business problem. These models don't know or care whether they'll live in PostgreSQL, MongoDB, or flat files. That's intentional.</p>
+<p>Storage decisions come later, after we understand touchpoints.</p>
+<hr />
+<h2>Data Touchpoints: Understanding Access Patterns</h2>
+<p>A <strong>touchpoint</strong> is how your system actually uses the data. Not &quot;what data exists&quot; but rather &quot;how is it accessed&quot;. This includes:</p>
+<ul>
+<li><strong>Queries</strong>: What data do you read?</li>
+<li><strong>Updates</strong>: What data do you write?</li>
+<li><strong>Frequency</strong>: How often?</li>
+<li><strong>Latency requirements</strong>: How fast must it be?</li>
+<li><strong>Volume</strong>: How much data?</li>
+</ul>
+<p>Understanding touchpoints is the bridge between domain modelling and technology choices.</p>
+<h3>Why Touchpoints Matter</h3>
+<p>Touchpoints reveal your system's <strong>actual constraints</strong>. Different touchpoints have different optimal technologies, and understanding these patterns prevents premature tech choices.</p>
+<p>You're not picking technologies based on marketing materials or blog posts, you're picking them based on <strong>measured, understood access patterns</strong>.</p>
+<h3>Common Touchpoint Patterns</h3>
+<p><strong>Transactional touchpoints</strong> involve complex updates with low latency and ACID requirements. Consider a <code>LegalCase</code> in a case management system: the access pattern is individual records with frequent small modifications. This implies a need for strong consistency and transaction support.</p>
+<p><strong>Analytical or reporting touchpoints</strong> are characterised by time-range queries, aggregations, and read-heavy workloads. An <code>AuditReport</code> querying <code>AuditLogItem</code> entries is typical.  Scan many records, filter by date or other criteria. These touchpoints are optimised for reads and often benefit from denormalized data structures.</p>
+<p><strong>Graph or relational touchpoints</strong> involve traversal operations and relationship-heavy queries. A <code>GraphQuery</code> exploring interconnected data follows edges and performs multi-hop queries. These can be satisfied either by specialized graph databases or by clever relational modelling with recursive queries and smart indexing.</p>
+<p>Beyond these three, other common patterns include <strong>high-throughput writes</strong> (constant data ingestion), <strong>time-series data</strong> (temporal queries and trends), and <strong>full-text search</strong> (text matching and ranking). Each has distinct access characteristics that inform technology choices.</p>
+<h3>Revisiting Our E-Commerce Example</h3>
+<p>Let's examine our earlier domain model through the lens of touchpoints:</p>
+<p><strong>Product Catalogue</strong>:</p>
+<ul>
+<li><strong>Transactional touchpoint</strong>: Frequent updates to <code>inventory_count</code>, price changes</li>
+<li><strong>Search touchpoint</strong>: Customers browsing by category, filtering by price range</li>
+<li>A single domain model, two very different access patterns</li>
+</ul>
+<p><strong>Order Processing</strong>:</p>
+<ul>
+<li><strong>Purely transactional</strong>: ACID properties required</li>
+<li>Order creation and inventory deduction must be atomic</li>
+<li>Cannot tolerate race conditions during checkout</li>
+</ul>
+<p><strong>Customer Analytics</strong>:</p>
+<ul>
+<li><strong>Analytical touchpoint</strong>: Reporting on order history, revenue by segment</li>
+<li>The same <code>Order</code> model that required strict transactional guarantees now serves aggregate queries across thousands of records</li>
+</ul>
+<p><strong>The key observation</strong>: One domain model (<code>Order</code>) can have multiple touchpoint types depending on how it's used. This is why premature technology choices are dangerous. You don't yet know all the ways your data will be accessed.</p>
+<h3>The Key Insight</h3>
+<p><strong>Touchpoints determine constraints, not technologies.</strong></p>
+<ul>
+<li>You can satisfy most touchpoints with multiple tech choices</li>
+<li>The right choice depends on <strong>scale</strong>, <strong>team expertise</strong>, and <strong>cost</strong></li>
+<li>A single PostgreSQL instance can handle transactional, analytical, and even graph workloads ... until it can't</li>
+</ul>
+<p><strong>The data layer ensures that &quot;until&quot; doesn't become a crisis.</strong></p>
+<hr />
+<h2>The Data Layer: Your Scaling Insurance</h2>
+<p>If you're unfamiliar with the concept of a data access layer, I've written about it in depth in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>.</p>
+<h3>The Provider Pattern (In Brief)</h3>
+<p>The core principles:</p>
+<ul>
+<li><strong>Immutable domain models</strong>: No ActiveRecord patterns, no embedded queries</li>
+<li><strong>Provider pattern</strong>: Well-defined interface accepting and returning domain types</li>
+<li><strong>Dependency injection</strong>: Application code doesn't know about storage implementation</li>
+</ul>
+<h3>Why This Matters for Scaling</h3>
+<p>The data layer is your <strong>abstraction boundary</strong>:</p>
+<ul>
+<li>Application code depends on the <strong>interface</strong>, not the implementation</li>
+<li>You can swap storage technologies without touching application logic</li>
+<li>When that analytical touchpoint outgrows PostgreSQL, you can introduce an analytics database behind the data layer whilst the application remains blissfully unaware</li>
+</ul>
+<h3>Your Insurance Policy</h3>
+<p>Think of the data layer as insurance:</p>
+<ul>
+<li>You're not optimising for scale today</li>
+<li>You're creating <strong>optionality</strong> for tomorrow</li>
+<li>It's your insurance against lock-in; technological, architectural, and strategic</li>
+</ul>
+<hr />
+<h2>The Scaling Pathway</h2>
+<p>The core philosophy is simple: <strong>defer decisions, not preparation</strong>.</p>
+<ul>
+<li>Don't pick technologies for hypothetical scale</li>
+<li>Do create the structure that allows future evolution</li>
+<li>This distinction is everything</li>
+</ul>
+<h3>A Pattern I've Seen Repeatedly</h3>
+<p>I've worked on multiple systems where this philosophy was either followed or ignored. The contrast is stark.</p>
+<h4>The Multi-Database Trap</h4>
+<p>An early-stage product used MySQL, MongoDB, and other databases for different features. Each choice seemed logical at the time.  Different tools for different jobs.</p>
+<p>But when analytics requirements emerged (they always do), joining data across systems became a costly nightmare. <strong>Months were spent building ETL pipelines and synchronisation layers</strong> that a unified data layer would have avoided entirely.</p>
+<h4>The Boring-Tech Winner</h4>
+<p>A high-throughput transaction processing system built with a standard web framework and SQL. Nothing exotic.</p>
+<p>It achieved <strong>low-latency performance</strong> by understanding its touchpoints and building a clean data layer from the start. When scale demands grew, the abstraction made evolution straightforward:</p>
+<ul>
+<li>Read replicas were added</li>
+<li>Indexes were optimised</li>
+<li>High-volume touchpoints were migrated to specialized storage</li>
+<li>All without rewriting the application</li>
+</ul>
+<p><strong>The lesson</strong>: Premature technology diversity costs more than premature optimisation.</p>
+<h3>Start Simple</h3>
+<p>Default to <strong>boring, proven technology</strong>:</p>
+<ul>
+<li><strong><a href="/posts/sqlite-secret-weapon">SQLite</a></strong> for side projects and MVPs</li>
+<li><strong>Single PostgreSQL instance</strong> for most startups</li>
+<li><strong>Sharded SQL with customer affinity</strong> for B2B SaaS products</li>
+</ul>
+<p>&quot;Boring technology&quot; is a feature, not a bug.</p>
+<h4>Why Simple Wins Early</h4>
+<ul>
+<li><strong>Lower cognitive overhead</strong> whilst iterating on the product</li>
+<li><strong>Well-understood failure modes</strong> and debugging</li>
+<li><strong>Easy to hire for</strong> with abundant documentation</li>
+<li><strong>Optimisation is cheap</strong> when you're small</li>
+</ul>
+<p>Adding an index or a read replica is a day's work, not a quarter-long migration project.</p>
+<h3>When to Evolve</h3>
+<p>Watch for <strong>clear signals</strong>, not hypotheticals:</p>
+<ul>
+<li><strong>Latency violations</strong>: Queries consistently missing SLAs</li>
+<li><strong>Cost curves</strong>: Database costs growing faster than revenue</li>
+<li><strong>Query complexity</strong>: Application code contorting itself to work around storage limits</li>
+<li><strong>Operational pain</strong>: Backups, replication, or scaling operations becoming frequent fire drills</li>
+</ul>
+<h4>The Evolution Process</h4>
+<p>When these signals appear, follow this process:</p>
+<ol>
+<li><strong>Identify the bottleneck touchpoint</strong>: Which access pattern is breaking? Be specific.</li>
+<li><strong>Evaluate alternatives</strong>: What technologies solve <em>this</em> constraint? Not &quot;what's popular&quot;, but &quot;what addresses this specific, measured problem&quot;.</li>
+<li><strong>Implement behind the data layer</strong>: Swap storage without touching application code.</li>
+<li><strong>Migrate incrementally</strong>: Run old and new systems in parallel. Achieve very low or even zero downtime.</li>
+</ol>
+<h4>Why This Pathway Wins</h4>
+<ul>
+<li><strong>Pay costs only when benefits are clear</strong></li>
+<li><strong>Not locked into early decisions</strong></li>
+<li><strong>Proven by experience</strong>: Stack Overflow, GitHub, and Stripe all scaled this way; incrementally, deliberately, and without Hail Mary rewrites</li>
+</ul>
+<hr />
+<h2>Summary: The Real Competitive Advantage</h2>
+<p>Most teams think scalability is about picking the right database. They're wrong.</p>
+<p><strong>It's about building a system that can evolve faster than the competition.</strong></p>
+<h3>The Hidden Cost of &quot;Best Practices&quot;</h3>
+<p>Microservices, event buses, and specialized databases all have their place. But adopting them early trades <strong>velocity for theoretical scale</strong>.</p>
+<p>Your competitors who shipped faster and deferred these costs will beat you to market. And in most cases, they'll reach your scale before you've finished configuring Kubernetes.</p>
+<h3>The Pathway Gives You Both</h3>
+<p>This pathway outlined in this article gives you:</p>
+<ol>
+<li><strong>Ship fast</strong> with simple, boring tech</li>
+<li><strong>Evolve deliberately</strong> when constraints become clear</li>
+<li><strong>Never rewrite</strong> because your data layer absorbs the changes</li>
+</ol>
+<h3>Architectural Martial Arts</h3>
+<p>This is architectural martial arts:</p>
+<ul>
+<li>You're not fighting scale; you're <strong>using its momentum</strong></li>
+<li>The data layer isn't overhead; it's <strong>the technique that lets a small team move like a large one</strong></li>
+</ul>
+<h3>The Final Insight</h3>
+<p>Most architecture advice tells you what to build. This article tells you what <strong>not</strong> to build ... yet.</p>
+<p><strong>That difference is worth millions in saved engineering time and preserved velocity.</strong></p>
+<p>Successful companies, maybe even your competitors, aren't building with fancier databases. They're succeeding by <strong>shipping faster</strong> whilst <strong>keeping their options open</strong>.</p>
+<p>A data layer gives you both.</p>
+<p><strong>It's the distilled secret to winning the game.</strong></p>
+<hr />
+<h2>Appendix: Technology Reference</h2>
+<p>When you do need to evolve, here's a starting point for mapping touchpoints to technologies. This is not prescriptive.  Your constraints matter more than these labels.</p>
+<ul>
+<li><strong>Transactional (high volume)</strong>: Sharded / Distributed SQL CitusDB, CockroachDB, Spanner, NewSQL</li>
+<li><strong>Analytical/Reporting</strong>: ClickHouse, TimescaleDB, or stay with PostgreSQL + read replicas</li>
+<li><strong>Graph traversal</strong>: Relational with recursive queries and smart indexing or specialised DBs (Neo4j, JanusGraph + Cassandra)</li>
+<li><strong>Full-text search</strong>: Elasticsearch, Meilisearch</li>
+<li><strong>High-throughput writes with predictable/restricted queries</strong>: Cassandra, ScyllaDB</li>
+<li><strong>Time-series</strong>: TimescaleDB, InfluxDB</li>
+</ul>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/introducing-the-resonance-protocol" rel="prev">
+                    <span class="meta-nav">&larr;</span> Introducing the Resonance Protocol
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude Sonnet 4.5</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

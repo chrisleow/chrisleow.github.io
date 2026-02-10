@@ -6,25 +6,24 @@
     <description>Latest posts from The Chris Frequency</description>
     <language>en-us</language>
     
-    <lastBuildDate>Tue, 12 Aug 2025 00:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Fri, 25 Jul 2025 00:00:00 GMT</lastBuildDate>
     
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
-
     
     <item>
-        <title>Hello, and Welcome!</title>
-        <link>https://chrisfrequency.com/posts/introduction</link>
-        <pubDate>Fri, 25 Jul 2025 00:00:00 GMT</pubDate>
-        <guid isPermaLink="true">https://chrisfrequency.com/posts/introduction</guid>
-        <description><![CDATA[This blog is an experiment, born of the Resonance Protocol in action. Together with my AI collaborators, we are building this simple, robust, and maintainable blog from scratch. The process of its creation is as much a part of the story as the articles it...]]></description>
+        <title>Defer the Database, Not the Design</title>
+        <link>https://chrisfrequency.com/posts/defer-the-database-not-the-design</link>
+        <pubDate>Tue, 10 Feb 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/defer-the-database-not-the-design</guid>
+        <description><![CDATA[Introduction The modern scaling landscape is overwhelming. Queues, event buses, microservices, serverless, Kubernetes. The list of "essential" technologies grows longer every year. It's very easy to get lost in the choices, and even easier to feel pressure to...]]></description>
     </item>
     
     <item>
-        <title>How to Build a Data Access Layer</title>
-        <link>https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</link>
-        <pubDate>Sat, 26 Jul 2025 00:00:00 GMT</pubDate>
-        <guid isPermaLink="true">https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</guid>
-        <description><![CDATA[As a technical system grows in scale and complexity, teams require more checks, balances, and standards to keep development manageable and maintain delivery velocity. While practices like feature flags and contract testing are common at this stage, one...]]></description>
+        <title>Introducing the Resonance Protocol</title>
+        <link>https://chrisfrequency.com/posts/introducing-the-resonance-protocol</link>
+        <pubDate>Tue, 12 Aug 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/introducing-the-resonance-protocol</guid>
+        <description><![CDATA[Have you ever had that nagging feeling that your AI interactions could be... better? When you're pair programming with an LLM and it confidently delivers exactly what you asked for, but somehow misses the point completely? Or when it gives you a technically...]]></description>
     </item>
     
     <item>
@@ -36,11 +35,19 @@
     </item>
     
     <item>
-        <title>Introducing the Resonance Protocol</title>
-        <link>https://chrisfrequency.com/posts/introducing-the-resonance-protocol</link>
-        <pubDate>Tue, 12 Aug 2025 00:00:00 GMT</pubDate>
-        <guid isPermaLink="true">https://chrisfrequency.com/posts/introducing-the-resonance-protocol</guid>
-        <description><![CDATA[Have you ever had that nagging feeling that your AI interactions could be... better? When you're pair programming with an LLM and it confidently delivers exactly what you asked for, but somehow misses the point completely? Or when it gives you a technically...]]></description>
+        <title>How to Build a Data Access Layer</title>
+        <link>https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</link>
+        <pubDate>Sat, 26 Jul 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</guid>
+        <description><![CDATA[As a technical system grows in scale and complexity, teams require more checks, balances, and standards to keep development manageable and maintain delivery velocity. While practices like feature flags and contract testing are common at this stage, one...]]></description>
+    </item>
+    
+    <item>
+        <title>Hello, and Welcome!</title>
+        <link>https://chrisfrequency.com/posts/introduction</link>
+        <pubDate>Fri, 25 Jul 2025 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/introduction</guid>
+        <description><![CDATA[This blog is an experiment, born of the Resonance Protocol in action. Together with my AI collaborators, we are building this simple, robust, and maintainable blog from scratch. The process of its creation is as much a part of the story as the articles it...]]></description>
     </item>
     
 </channel>

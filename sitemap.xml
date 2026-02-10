@@ -2,29 +2,29 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://chrisfrequency.com/</loc>
-    <lastmod>2025-08-13</lastmod>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
     <loc>https://chrisfrequency.com/about</loc>
-    <lastmod>2025-08-13</lastmod>
+    <lastmod>2026-02-18</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
 
   <url>
-    <loc>https://chrisfrequency.com/posts/introduction</loc>
-    <lastmod>2025-07-25</lastmod>
+    <loc>https://chrisfrequency.com/posts/defer-the-database-not-the-design</loc>
+    <lastmod>2026-02-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</loc>
-    <lastmod>2025-07-26</lastmod>
+    <loc>https://chrisfrequency.com/posts/introducing-the-resonance-protocol</loc>
+    <lastmod>2025-08-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -37,8 +37,15 @@
   </url>
 
   <url>
-    <loc>https://chrisfrequency.com/posts/introducing-the-resonance-protocol</loc>
-    <lastmod>2025-08-12</lastmod>
+    <loc>https://chrisfrequency.com/posts/how-to-build-a-data-access-layer</loc>
+    <lastmod>2025-07-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://chrisfrequency.com/posts/introduction</loc>
+    <lastmod>2025-07-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

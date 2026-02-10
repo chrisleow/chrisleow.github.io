@@ -325,3 +325,15 @@ pre .n {
     font-weight: bold;
     margin-left: 5px;
 }
+
+/* --- Mermaid Diagrams --- */
+
+.mermaid-diagram {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}

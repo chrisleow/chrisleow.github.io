@@ -11,11 +11,19 @@
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
     
     <item>
+        <title>Agile&#39;s Missing Layer: The Organisational Retrospective</title>
+        <link>https://chrisfrequency.com/posts/agile-missing-layer-retrospective</link>
+        <pubDate>Sat, 21 Feb 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/agile-missing-layer-retrospective</guid>
+        <description><![CDATA[Agile has a reputation problem. Depending on who you ask, it's either the salvation of software delivery or the source of its dysfunction. Standups that waste everyone's morning. Sprints that deliver activity but not progress. Velocity charts that management...]]></description>
+    </item>
+    
+    <item>
         <title>Defer the Database, Not the Design</title>
         <link>https://chrisfrequency.com/posts/defer-the-database-not-the-design</link>
         <pubDate>Tue, 10 Feb 2026 00:00:00 GMT</pubDate>
         <guid isPermaLink="true">https://chrisfrequency.com/posts/defer-the-database-not-the-design</guid>
-        <description><![CDATA[Introduction The modern scaling landscape is overwhelming. Queues, event buses, microservices, serverless, Kubernetes. The list of "essential" technologies grows longer every year. It's very easy to get lost in the choices, and even easier to feel pressure to...]]></description>
+        <description><![CDATA[The modern scaling landscape is overwhelming. Queues, event buses, microservices, serverless, Kubernetes. The list of "essential" technologies grows longer every year. It's very easy to get lost in the choices, and even easier to feel pressure to adopt...]]></description>
     </item>
     
     <item>

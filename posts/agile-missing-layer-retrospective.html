@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agile&#39;s Missing Layer: The Organisational Retrospective | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/agile-missing-layer-retrospective">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/defer-the-database-not-the-design" rel="prev">
+                    <span class="meta-nav">&larr;</span> Defer the Database, Not the Design
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Agile&#39;s Missing Layer: The Organisational Retrospective</h1>
+        <p class="post-meta">
+            <time datetime="2026-02-21">
+                February 21, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Agile has a reputation problem. Depending on who you ask, it's either the salvation of software delivery or the source of its dysfunction. Standups that waste everyone's morning. Sprints that deliver activity but not progress. Velocity charts that management loves and engineers distrust.</p>
+<p>The critics aren't entirely wrong. But their diagnosis usually is.</p>
+<p>The ceremonies aren't the problem. The problem is a specific, structural omission that almost every organisation makes, and it has been hiding in plain sight for years.</p>
+<h2>What Agile Actually Is</h2>
+<p>Before diagnosing what's broken, it helps to be precise about what Agile actually is at its core: <strong>a tight feedback loop</strong>.</p>
+<ol>
+<li><strong>Deliver in small increments.</strong></li>
+<li><strong>Inspect the outcome honestly.</strong></li>
+<li><strong>Adjust direction.</strong></li>
+<li><strong>Repeat.</strong></li>
+</ol>
+<p>That's it. The ceremonies (standups, sprint reviews, planning sessions) exist to <em>support</em> this loop. They are scaffolding, not the structure. And this distinction matters enormously, because it means you can run every ceremony faithfully and still fail to do Agile at all.</p>
+<h2>Where Are We Today?</h2>
+<p>Most teams run the ceremonies. Standups happen. Sprints are planned and reviewed. Backlogs are refined.</p>
+<p>And yet projects still drift, miss, and overrun. Stakeholders remain sceptical. Delivery feels unpredictable. The pushback is real and growing: Agile is rigid, it's bureaucratic, the business never really bought in.</p>
+<p>These are genuine symptoms. But they're pointing at the wrong cause.</p>
+<p>It also didn't happen by accident. A significant industry grew up around selling Agile: frameworks, certifications, tooling. The ceremonies became products, and products need to justify their existence. Hype creates inertia, and that inertia is still working against us.</p>
+<p>Velocity metrics creating pressure without accountability: that's a management problem layered on top of Agile, not a property of Agile itself. Business stakeholders remaining sceptical because predictability was promised and not delivered: that's a planning problem. The formulaic feeling of ceremonies is what happens when the ceremony outlives the understanding of why it exists.</p>
+<p>The underlying mechanism is still sound. Something else is broken.</p>
+<h2>The Retrospective Gap</h2>
+<p>Here's the specific thing that's broken: <strong>organisations run retrospectives at the team level and almost nowhere else</strong>.</p>
+<p>Most teams retrospect after every sprint. It's table stakes at this point. But above the team (at the programme level, the portfolio level, the organisation level) retrospectives almost <strong>never</strong> happen.</p>
+<p>In many years across multiple organisations, I can count the retrospectives above team level on one hand, and most of those were at startups small enough that every level <em>was</em> the team level. Talking to peers, this is not unusual. It appears to be the industry norm.</p>
+<p>This gap is fatal to the whole system.</p>
+<p>The retrospective is the only ceremony that <em>closes</em> the feedback loop. Without it, you're not doing Agile; you're doing a fast and loose version of Waterfall. Teams iterate, but the organisation cannot change direction. Decisions made at the portfolio level about scope, priority, and direction go uninspected. The unknowns that couldn't be resolved up front (and in complex projects, there are many) accumulate quietly until they surface as a failed delivery.</p>
+<p>&quot;Move fast&quot; without course-correction is just moving fast in the wrong direction.</p>
+<h2>The Ego Problem</h2>
+<p>Agile is mechanically simple. The ceremonies are not hard to understand or run. So why does the retrospective disappear above the team level?</p>
+<p>Because <strong>retrospectives are hard on the ego</strong>.</p>
+<p>At the team level, a retrospective asks: did this sprint go well? What should we do differently next time? The stakes are relatively low. At the organisational level, a retrospective asks something much more uncomfortable: was the plan wrong? Did we make the right calls? Should we change direction?</p>
+<p>In large organisations, being wrong carries career risk. Admitting that a programme-level decision was mistaken, publicly and in a formal setting, is an invitation for scrutiny. So the feedback gets suppressed. The plan gets defended. The loop stays broken.</p>
+<p><strong>This is not a process failure. It's a leadership and culture failure.</strong> And it's why fixing it requires more than introducing another velocity chart.</p>
+<h2>What It Looks Like When It Works</h2>
+<p>I saw this done well at a startup building a Customer Due Diligence (KYB) application. The team was small, just three developers, working on a problem domain that was genuinely complex and poorly understood at the outset. Ambitious scope, unpredictable requirements, and no realistic path to getting everything right up front.</p>
+<p>A concrete example: we needed to build a record matching algorithm. The first attempt used LLMs. It didn't work well enough. Rather than defending the choice or spending more time optimising it, we called it and moved on. The second attempt used a fine-tuned BERT model to extract features. Also fell short. Again, we stopped, assessed, and changed direction.</p>
+<p>The final approach was a largely hand-coded algorithmic system producing a detailed, fine-grained taxonomy. Unglamorous. Counterintuitive, given where the industry's attention was pointing. And it's now an increasingly successful product.</p>
+<p>What made this possible wasn't exceptional technical skill, though the team had that. It was that <strong>each failed approach was treated as information, not failure</strong>. There was no sunk-cost defence. No one needed to be vindicated for having recommended LLMs. The only question at each retrospective was: what do we know now that we didn't know before, and what should we do differently?</p>
+<p>That's the feedback loop working. That's Agile.</p>
+<p>This was a small team. The feedback loop was short and the stakes were contained. Scaling this to an organisation is harder; I won't pretend otherwise. But the principle is identical, and the failure mode when you don't do it is identical too.</p>
+<h2>What an Organisational Retrospective Actually Looks Like</h2>
+<p>An organisational retrospective is not a team retrospective scaled up. The purpose is different. The participants are different. The questions are different.</p>
+<p>It's triggered by major deliveries, significant misses, or a regular cadence; quarterly is a reasonable starting point. The participants are the people who made the programme and portfolio level decisions and the team product / engineering leads, not the teams who executed them.</p>
+<p>The questions it must answer honestly:</p>
+<ul>
+<li>Did we deliver what we set out to? If not, what were the real constraints: technical, organisational, or in our original assumptions?</li>
+<li>Were our assumptions about the problem correct? What did we learn that we didn't know at the start?</li>
+<li>What would we do differently at the programme or portfolio level?</li>
+</ul>
+<p><strong>The hard requirement is genuine psychological safety.</strong> Not the performative version. The real thing. If a retrospective is safe for everyone except the people who made the decisions, it is not safe. Leadership must model it.</p>
+<ul>
+<li><strong>Be wrong out loud.</strong></li>
+<li><strong>Call your own decisons into question.</strong></li>
+</ul>
+<p>Make it clear that changing direction is a sign of good judgement, not weakness.</p>
+<h2>Summary</h2>
+<p>Agile's ceremonies are not the problem. Stop blaming the standup.</p>
+<p>The feedback loop is broken at the organisational level because org-level retrospectives don't happen. Teams iterate within a system that cannot change direction, and the results are predictable: activity without progress, speed without accuracy, delivery without fit.</p>
+<p>This is a culture problem before it's a process problem, and it lives with leadership. The fix isn't complicated: introduce retrospectives at every level, make them genuinely safe, and model honesty about being wrong from the top.</p>
+<p><strong>The feedback loop <em>is</em> Agile. Close the loop.</strong></p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/defer-the-database-not-the-design" rel="prev">
+                    <span class="meta-nav">&larr;</span> Defer the Database, Not the Design
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Database is Already a Queue | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/database-as-a-queue">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/strategic-monolith-satellites" rel="prev">
+                    <span class="meta-nav">&larr;</span> Strategic Monolith + Satellites
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Your Database is Already a Queue</h1>
+        <p class="post-meta">
+            <time datetime="2026-02-26">
+                February 26, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>&quot;Don't use your database as a queue&quot; is one of those pieces of engineering orthodoxy that gets repeated so often it starts to feel like a law. It isn't. It's a guideline with a scale constraint attached, and for most workloads that constraint is never reached.</p>
+<p>The argument against is legitimate at extremely high throughputs; a dedicated message broker will outperform a relational database. The argument in favour is equally legitimate, and almost never stated as plainly: your database is already running, already monitored, already backed up, and already the source of truth for your business data. A queue is just a table with a few index tricks. Adding one costs almost nothing operationally.</p>
+<p>The case gets stronger when you consider what you give up with a dedicated broker:</p>
+<ul>
+<li><strong>One more component to run.</strong> Deployment, monitoring, upgrades, on-call runbooks.</li>
+<li><strong>Consumer group management.</strong> Schema registries, offset tracking, partition assignment.</li>
+<li><strong>The dual-write problem.</strong> Writing to your database and enqueuing in the same logical operation requires distributed transactions or careful idempotency design. With a database queue, it's a single <code>INSERT</code> in a single transaction.</li>
+<li><strong>Observability.</strong> When a queue item is failing in production, the cause is almost always in the data: a bad record, an unexpected foreign key, a customer account in a broken state. With a dedicated broker you're correlating message IDs across systems. With a database queue, you write a <code>JOIN</code>.</li>
+</ul>
+<p>The three patterns that follow are illustrative, not exhaustive. Their purpose is to show the breadth of what a database-backed approach is genuinely capable of; spanning architectural concerns like fair queuing and per-customer rate limits (features most dedicated brokers don't offer out of the box) through to operational ones like observability and monitoring. All examples use Postgres; the patterns rely on Postgres-specific features (<code>FOR UPDATE SKIP LOCKED</code>, <code>UPDATE ... RETURNING</code>, partial indexes). If you do eventually outgrow this approach, the queue table is decoupled from your business data, so swapping the backend is a well-scoped change rather than a rewrite.</p>
+<h2>Basic Pattern</h2>
+<p>The core pattern uses a dedicated queue table linked 1-to-1 to the item table, rather than adding queue columns directly to the item.</p>
+<p>This separation is worth the small amount of extra schema. Queue state is transient and noisy: rows are constantly being updated (claimed), deleted (completed), and re-inserted (retried). Mixing that with your business data creates vacuum pressure, bloated updates, and indexes that grow to include items long since processed. A separate table keeps business data clean and lets the queue index stay lean: a partial index on <code>next_action_at</code> covers only items currently in the queue.</p>
+<p>Three Postgres features do the heavy lifting:</p>
+<ul>
+<li><strong><code>FOR UPDATE SKIP LOCKED</code></strong>: allows multiple workers to pull from the queue simultaneously. Rather than blocking on a locked row, a worker skips it and claims the next available one.</li>
+<li><strong><code>UPDATE ... RETURNING</code></strong>: the claim is a single atomic query. There is no SELECT-then-UPDATE window in which two workers can claim the same item.</li>
+<li><strong>The lock-via-future-timestamp mechanic</strong>: this is the key insight. Claiming an item doesn't lock a database row indefinitely; it pushes <code>next_action_at</code> forward by an interval. If the worker crashes mid-processing, the item becomes visible again automatically when the interval expires. No heartbeat, no explicit lock release, no cleanup job required.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="c1">-- table of items that we want to process in some kind of queue</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">field_1</span><span class="w"> </span><span class="p">...,</span>
+<span class="w">  </span><span class="n">field_2</span><span class="w"> </span><span class="p">...,</span>
+<span class="p">);</span>
+
+<span class="c1">-- dedicated queue table, linked to items table 1-to-1</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">item_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="p">)</span>
+
+<span class="c1">-- only store enqueued items that are due to be processed</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_next_action_at</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">next_action_at</span><span class="p">)</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- optional: useful for searching errors from a monitoring dashboard</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_last_error</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">attempt_last_error</span><span class="p">)</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="n">GIN</span><span class="w"> </span><span class="p">(</span><span class="n">to_tsvector</span><span class="p">(</span><span class="s1">&#39;english&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="p">))</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- query to return the next item</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">next_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">SELECT</span><span class="w"> </span><span class="n">item_id</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span>
+<span class="w">  </span><span class="k">LIMIT</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="k">FOR</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="n">SKIP</span><span class="w"> </span><span class="n">LOCKED</span>
+<span class="p">)</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="k">SET</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">&#39;1 hour&#39;</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">next_id</span><span class="w"> </span><span class="n">ni</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">ni</span><span class="p">.</span><span class="n">item_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span>
+<span class="n">RETURNING</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="p">;</span>
+</pre></div>
+<p>The worker loop is simple: claim an item, process it, delete it on success. On failure, increment the attempt counter, record the error, and re-enqueue with a recalculated <code>next_action_at</code>. Once the attempt count exceeds the maximum, the item is moved to the dead-letter queue rather than re-enqueued. The <code>time.sleep(...)</code> on an empty queue is simple backoff to avoid polling the database at full speed when there is nothing to do.</p>
+<div class="highlight"><pre><span></span><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QueuedItem</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+    <span class="n">next_action_at</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">attempt</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">attempt_last_error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">item</span><span class="p">:</span> <span class="n">T</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">process_items</span><span class="p">():</span>
+    <span class="k">while</span> <span class="n">is_processing</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">queued_item</span> <span class="o">=</span> <span class="n">get_next_queued_item</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">queued_item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">NO_WORK_DELAY_SECONDS</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">process</span><span class="p">(</span><span class="n">queued_item</span><span class="o">.</span><span class="n">item</span><span class="p">)</span>
+            <span class="n">delete_from_queue</span><span class="p">(</span><span class="n">queued_item</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">queued_item</span><span class="o">.</span><span class="n">attempt</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">queued_item</span><span class="o">.</span><span class="n">attempt_last_error</span> <span class="o">=</span> <span class="n">format_error</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_final_attempt</span><span class="p">(</span><span class="n">queued_item</span><span class="o">.</span><span class="n">attempt</span><span class="p">):</span>
+                <span class="n">move_to_dead_letter_queue</span><span class="p">(</span><span class="n">queued_item</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">queued_item</span><span class="o">.</span><span class="n">next_action_at</span> <span class="o">=</span> <span class="n">calculate_next_action_at</span><span class="p">(</span><span class="n">queued_item</span><span class="o">.</span><span class="n">attempt</span><span class="p">)</span>
+                <span class="n">update_in_queue</span><span class="p">(</span><span class="n">queued_item</span><span class="p">)</span>
+</pre></div>
+<h3>Failure Modes and Recovery</h3>
+<p>There are two distinct failure modes, and they are handled differently.</p>
+<p><strong>Worker crash.</strong> The lock interval handles this automatically. If the worker process dies mid-job, <code>next_action_at</code> is already set to an hour in the future; the item re-surfaces when that interval expires, with no application logic required. The <code>INTERVAL '1 hour'</code> in the claim query is the knob for this.</p>
+<p><strong>Application exception.</strong> The <code>except</code> block handles this explicitly. The attempt counter is incremented and <code>calculate_next_action_at</code> determines the next retry window. This is where exponential backoff belongs: <code>NOW() + INTERVAL '1 minute' * 2^attempt</code> gives you 1 minute, then 2, then 4, preventing your workers from hammering a failing downstream dependency on every retry cycle.</p>
+<p><strong>Dead letters.</strong> Items that exceed a maximum attempt threshold need to be surfaced rather than silently re-queued forever. <code>is_final_attempt</code> encapsulates that threshold check; <code>move_to_dead_letter_queue</code> handles disposal. Two approaches for what disposal means:</p>
+<ul>
+<li><strong>Simple approach</strong>: after max attempts, park the item by setting <code>next_action_at = NULL</code> rather than re-queuing. Dead items are then detectable with <code>SELECT * FROM my_item_queue WHERE next_action_at IS NULL</code>. <code>move_to_dead_letter_queue</code> is just an update to the same row.</li>
+<li><strong>Explicit DLQ table</strong>: move the row to a dedicated dead-letter table on max attempts. Cleaner separation, easier to alert on independently, and the right choice if your dead-letter queue needs its own retention policy or tooling. <code>move_to_dead_letter_queue</code> becomes a delete-and-insert across two tables, wrapped in a transaction.</li>
+</ul>
+<h2>Fair Queuing Batches</h2>
+<p>The basic pattern works well when all items are equal. In a multi-tenant system where each customer has a different rate limit, it falls apart: a naive <code>LIMIT 1</code> worker will process whichever customer has the most pending items, starving everyone else.</p>
+<p>The solution is a single dispatcher that runs once per minute and claims a batch. For each customer, it uses <code>RANK() OVER (PARTITION BY customer_id ORDER BY next_action_at ASC)</code> to rank their pending items by age, then takes the top N items where N equals <code>rate_per_minute</code>. The result is a batch that respects per-customer limits across any number of customers, in a single declarative query. Most dedicated brokers have no native concept of per-consumer rate limits; it's application logic you'd build on top of them. Here it's just the pattern.</p>
+<p>Because there is only one dispatcher (running on a timer rather than concurrently), <code>SKIP LOCKED</code> is not needed. The query either runs or it doesn't; there is no race to claim the same items. This simplifies the query considerably. The trade-off is that the dispatcher is a single point of failure: if it crashes, items queue up until it restarts. For latency-insensitive workloads this is usually fine (a missed minute is a minor delay, not an outage), but it is worth being aware of if your processing deadlines are tight.</p>
+<p><code>customer_id</code> is denormalised into the queue table so the composite partial index on <code>(customer_id, next_action_at)</code> can cover the dispatcher query entirely, without touching <code>my_item</code> at all. As a side benefit, <code>customer_id</code> is a natural partition key: if you ever need to scale horizontally, the schema is shard-friendly by design.</p>
+<div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">rate_per_minute</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">,</span>
+<span class="w">  </span><span class="p">...</span>
+<span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">field_1</span><span class="w"> </span><span class="p">...,</span>
+<span class="w">  </span><span class="n">field_2</span><span class="w"> </span><span class="p">...,</span>
+<span class="p">);</span>
+
+<span class="c1">-- customer_id is denormalised into the queue table so the index can cover it</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">item_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="p">);</span>
+
+<span class="c1">-- only store enqueued items that are due to be processed, with customer_id</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_next_action_at</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">next_action_at</span><span class="p">)</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- optional: useful for searching errors from a monitoring dashboard</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_last_error</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">attempt_last_error</span><span class="p">)</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="n">GIN</span><span class="w"> </span><span class="p">(</span><span class="n">to_tsvector</span><span class="p">(</span><span class="s1">&#39;english&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="p">))</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- query to return a batch of items, run once per minute with single dispatcher</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">eligible</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">rank</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">SELECT</span>
+<span class="w">    </span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">    </span><span class="n">customer_id</span><span class="p">,</span>
+<span class="w">    </span><span class="n">RANK</span><span class="p">()</span><span class="w"> </span><span class="n">OVER</span><span class="w"> </span><span class="p">(</span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">ASC</span><span class="p">)</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span>
+<span class="p">),</span>
+<span class="n">next_ids</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">SELECT</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">eligible</span><span class="w"> </span><span class="n">e</span>
+<span class="w">    </span><span class="k">INNER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">rank</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">rate_per_minute</span>
+<span class="p">)</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="k">SET</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">&#39;1 hour&#39;</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">next_ids</span><span class="w"> </span><span class="n">nis</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">nis</span><span class="p">.</span><span class="n">item_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span>
+<span class="n">RETURNING</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">customer_id</span><span class="p">;</span>
+</pre></div>
+<p>The batch pattern has one characteristic limitation: all items in a batch fire simultaneously. If a downstream system is sensitive to bursts rather than just sustained rate, read on.</p>
+<h2>Fair Queuing Delay</h2>
+<p>The batch pattern fires N items at the top of each minute. For many use cases this is fine. For others (outbound webhooks, SMS delivery, calls to rate-limited third-party APIs) the downstream system cares about <em>spacing</em>, not just volume. Sending 60 messages in a burst at minute boundaries is meaningfully different from sending one per second, even if the average rate is identical.</p>
+<p>The distinction in simple terms: batching is &quot;N items now, wait a minute.&quot; Delay is &quot;one item now, wait 1/N of a minute, one item, wait 1/N...&quot;</p>
+<p>This pattern introduces a <strong>frontier table</strong> that tracks when each customer is next eligible to send. It is declared <code>UNLOGGED</code> because it holds ephemeral state: if the database restarts, the frontier resets to NULL and every customer becomes immediately eligible, which is safe (they will simply fire their next item slightly early on restart).</p>
+<p>Each claim query does three things atomically:</p>
+<ol>
+<li>Finds an item that is both due (<code>next_action_at &lt;= NOW()</code>) and whose customer is past their frontier (<code>frontier_at &lt;= NOW()</code>, or not yet set).</li>
+<li>Updates the customer's frontier to <code>NOW() + (1 minute / rate_per_minute)</code>, scheduling the next eligible window.</li>
+<li>Claims the item by pushing <code>next_action_at</code> forward, as in the basic pattern.</li>
+</ol>
+<p><code>FOR UPDATE OF miq SKIP LOCKED</code> locks only the queue row, not the frontier row. Multiple workers can therefore run concurrently: each races to claim a different item, and the frontier update is committed atomically in the same transaction.</p>
+<p>The trade-off versus the batch pattern is complexity: the query is harder to reason about, and it processes one item per transaction. Use it when burst behaviour causes real downstream problems; it is overkill otherwise. The per-customer spacing control it provides, though, is not something you'd find in most dedicated broker solutions at any price.</p>
+<div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">rate_per_minute</span><span class="w"> </span><span class="nb">FLOAT</span><span class="p">,</span>
+<span class="w">  </span><span class="p">...</span>
+<span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="n">UNLOGGED</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">customer_queue_frontier</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">frontier_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span>
+<span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">field_1</span><span class="w"> </span><span class="p">...,</span>
+<span class="w">  </span><span class="n">field_2</span><span class="w"> </span><span class="p">...,</span>
+<span class="p">);</span>
+
+<span class="c1">-- customer_id is denormalised into the queue table so the index can cover it</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="n">item_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">customer_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">  </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="p">);</span>
+
+<span class="c1">-- only store enqueued items that are due to be processed, with customer_id</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_next_action_at</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">next_action_at</span><span class="p">)</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- optional: useful for searching errors from a monitoring dashboard</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">my_item_queue_last_error</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="p">(</span><span class="n">attempt_last_error</span><span class="p">)</span>
+<span class="w">  </span><span class="k">USING</span><span class="w"> </span><span class="n">GIN</span><span class="w"> </span><span class="p">(</span><span class="n">to_tsvector</span><span class="p">(</span><span class="s1">&#39;english&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="p">))</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">attempt_last_error</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">;</span>
+
+<span class="c1">-- get the next eligible item</span>
+<span class="k">WITH</span><span class="w"> </span><span class="n">next_id</span><span class="w"> </span><span class="p">(</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">customer_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">SELECT</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">customer_queue_frontier</span><span class="w"> </span><span class="n">cf</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cf</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">WHERE</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="p">(</span><span class="n">cf</span><span class="p">.</span><span class="n">frontier_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="n">cf</span><span class="p">.</span><span class="n">frontier_at</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="p">)</span>
+<span class="w">  </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">next_action_at</span>
+<span class="w">  </span><span class="k">LIMIT</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="k">FOR</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="n">miq</span><span class="w"> </span><span class="n">SKIP</span><span class="w"> </span><span class="n">LOCKED</span>
+<span class="p">),</span>
+<span class="n">customer_frontier_id</span><span class="w"> </span><span class="p">(</span><span class="n">customer_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">customer_queue_frontier</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">frontier_at</span><span class="p">)</span>
+<span class="w">  </span><span class="k">SELECT</span><span class="w"> </span><span class="n">ni</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">&#39;1 minute&#39;</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">rate_per_minute</span><span class="p">)</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">next_id</span><span class="w"> </span><span class="n">ni</span>
+<span class="w">  </span><span class="k">INNER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ni</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">CONFLICT</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="w"> </span><span class="k">DO</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="n">frontier_at</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EXCLUDED</span><span class="p">.</span><span class="n">frontier_at</span>
+<span class="w">  </span><span class="n">RETURNING</span><span class="w"> </span><span class="n">id</span>
+<span class="p">)</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="k">SET</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">&#39;1 hour&#39;</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">next_id</span><span class="w"> </span><span class="n">ni</span>
+<span class="k">INNER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">customer_frontier_id</span><span class="w"> </span><span class="n">cfi</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">cfi</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ni</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ni</span><span class="p">.</span><span class="n">item_id</span>
+<span class="n">RETURNING</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="p">,</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">customer_id</span><span class="p">;</span>
+</pre></div>
+<h2>Observability</h2>
+<p>How much you invest in error introspection depends on your throughput.</p>
+<p>At <strong>low throughput</strong>, the GIN index on <code>attempt_last_error</code> is a useful for debugging, and a good fit. Full-text search across error messages is fast, and the write overhead of maintaining the index is negligible at low insert rates:</p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span>
+<span class="w">  </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span><span class="p">,</span>
+<span class="w">  </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt</span><span class="p">,</span>
+<span class="w">  </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt_last_error</span><span class="p">,</span>
+<span class="w">  </span><span class="n">miq</span><span class="p">.</span><span class="n">next_action_at</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">to_tsvector</span><span class="p">(</span><span class="s1">&#39;english&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt_last_error</span><span class="p">)</span><span class="w"> </span><span class="o">@@</span><span class="w"> </span><span class="n">to_tsquery</span><span class="p">(</span><span class="s1">&#39;timeout | connection&#39;</span><span class="p">)</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">next_action_at</span><span class="p">;</span>
+</pre></div>
+<p>At <strong>moderate throughput</strong>, consider dropping the GIN index but keep the <code>attempt_last_error TEXT NULL</code> column. You lose full-text search, but the column still enables something a dedicated broker cannot easily offer: ad-hoc SQL analysis against your live business data. Because the queue table lives in the same database as everything else, a single query can isolate exactly which customers are affected, what their account state looks like, and whether the failures share a pattern in the underlying data:</p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span>
+<span class="w">  </span><span class="k">c</span><span class="p">.</span><span class="n">id</span><span class="p">,</span>
+<span class="w">  </span><span class="k">c</span><span class="p">.</span><span class="n">name</span><span class="p">,</span>
+<span class="w">  </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failing_items</span><span class="p">,</span>
+<span class="w">  </span><span class="k">MAX</span><span class="p">(</span><span class="n">miq</span><span class="p">.</span><span class="n">attempt</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">max_attempts</span><span class="p">,</span>
+<span class="w">  </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt_last_error</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span><span class="w"> </span><span class="n">miq</span>
+<span class="k">INNER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">my_item</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">item_id</span>
+<span class="k">INNER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">customer</span><span class="w"> </span><span class="k">c</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt_last_error</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="k">c</span><span class="p">.</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">miq</span><span class="p">.</span><span class="n">attempt_last_error</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">failing_items</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</pre></div>
+<p>With a dedicated broker you would be correlating message IDs across systems. Here you write a <code>JOIN</code>. GIN index maintenance is expensive under write pressure, and a mass failure event is exactly when you can least afford the extra overhead; the column itself remains cheap, and the SQL access it enables is often all you need to diagnose the problem quickly.</p>
+<p>At <strong>high throughput</strong>, even writing error strings to a TEXT column on every failure adds up. At that scale your queue is moving fast enough that your application logs, metrics, and tracing tooling are better indicators of what's going wrong than a column on a database row. The <code>attempt</code> counter alone is often sufficient: a rising attempt count is a reliable signal that something is failing, and the cause is almost always visible in your observability stack.</p>
+<h2>Monitoring</h2>
+<p>Because the queue is just a table, any metric you want is a SQL query. Queue depth, in-flight items, dead letters, per-customer backlog, retry distribution: all expressible without any broker-specific SDK or metrics API:</p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span>
+<span class="w">  </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">())</span><span class="w">          </span><span class="k">AS</span><span class="w"> </span><span class="n">pending</span><span class="p">,</span>
+<span class="w">  </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">NOW</span><span class="p">())</span><span class="w">           </span><span class="k">AS</span><span class="w"> </span><span class="n">in_flight</span><span class="p">,</span>
+<span class="w">  </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="p">)</span><span class="w">           </span><span class="k">AS</span><span class="w"> </span><span class="n">dead_letters</span><span class="p">,</span>
+<span class="w">  </span><span class="k">MAX</span><span class="p">(</span><span class="n">attempt</span><span class="p">)</span><span class="w">                                             </span><span class="k">AS</span><span class="w"> </span><span class="n">max_attempts</span><span class="p">,</span>
+<span class="w">  </span><span class="k">AVG</span><span class="p">(</span><span class="n">attempt</span><span class="p">)</span><span class="w">                                             </span><span class="k">AS</span><span class="w"> </span><span class="n">avg_attempts</span><span class="p">,</span>
+<span class="w">  </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="k">MIN</span><span class="p">(</span><span class="n">next_action_at</span><span class="p">)</span>
+<span class="w">    </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">next_action_at</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">())</span><span class="w">                 </span><span class="k">AS</span><span class="w"> </span><span class="n">oldest_pending</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">my_item_queue</span><span class="p">;</span>
+</pre></div>
+<p>Because these are just SQL queries, exporting them as metrics requires nothing special: run the query on a schedule and push the results to whatever you already use for metrics. No separate agent, no broker-specific SDK, no specialist / vendor query language to learn.</p>
+<p>The practical upshot: queue depth trending up, dead letter count non-zero, or max attempts climbing are all conditions you can alert on with a threshold rule against a gauge, just like any other metric in your system. With a dedicated broker these signals come through a separate API, a separate dashboard, and a separate alerting integration.</p>
+<p>The more interesting capability is the metrics that a dedicated broker simply cannot produce: anything that requires joining queue state to business data, for example:</p>
+<ul>
+<li>Queue depth broken down by customer subscription tier</li>
+<li>Failure rate for accounts created in the last 30 days</li>
+<li>Items stuck in-flight belonging to customers whose accounts are now suspended</li>
+</ul>
+<p>These cross-cutting questions would require pulling data from two separate systems and correlating them in application code or a data warehouse. With a database queue they are just queries: expressible in a single SQL statement, runnable on demand, and trivially added to the same scheduled export as the standard metrics above.</p>
+<h2>What's a Few Thousand Items a Second?</h2>
+<p>All three patterns can work wonderfully and easily handle a few thousand work items per second at the very least.  Some of the <a href="https://en.wikipedia.org/wiki/Architecture_astronaut">architecture astronauts</a> out there may scoff, but to put this into context, this is thousands of work items per second day in, day out.  That's <em>tens or hundreds of billions of work items per year</em> at a minimum before you have to start thinking about expanding the system.  Think carefully, are you really processing that much?</p>
+<p>In this case, you have the following options:</p>
+<ul>
+<li><strong>Tune first.</strong> Batch more aggressively, increase worker concurrency, optimise connection pooling. There is usually more headroom here than expected.</li>
+<li><strong>Partition the table.</strong> Postgres table partitioning by <code>customer_id</code> (or a suitable key) requires no application changes and significantly reduces vacuum pressure.</li>
+<li><strong>Shard.</strong> If you are using a shardable solution like CitusDB and <code>customer_id</code> is already in your schema as a natural partition key, horizontal sharding is a well-scoped change.</li>
+</ul>
+<h2>Summary</h2>
+<p>For a small minority of development teams, this won't be enough.  Anyone out there who <strong>really</strong> need a dedicated solution; you know who you are.  For the rest of us, a database-backed solution delivers plenty of headroom, and is already running, already monitored, and already the source of truth. A queue table adds almost nothing to your operational burden.</p>
+<p>Three patterns, each suited to a different problem:</p>
+<ul>
+<li><strong>Basic pattern</strong>: crash-safe, multi-worker processing using <code>FOR UPDATE SKIP LOCKED</code> and the lock-via-future-timestamp mechanic. The right starting point for most use cases.</li>
+<li><strong>Fair queuing (batch)</strong>: a single dispatcher using <code>RANK() OVER (PARTITION BY customer_id)</code> to distribute work fairly across customers at different rate limits. Simple and effective when per-minute latency is acceptable.</li>
+<li><strong>Fair queuing (delay)</strong>: a frontier table to space items evenly across time rather than firing in bursts. More complex, but the right tool when downstream systems are sensitive to burst load.</li>
+</ul>
+<p>The schema is consistent across all three: a queue table separate from your business data, <code>customer_id</code> denormalised in where needed, partial indexes for efficiency, and a GIN index for error observability.</p>
+<p>Happy queuing.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/strategic-monolith-satellites" rel="prev">
+                    <span class="meta-nav">&larr;</span> Strategic Monolith + Satellites
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -65,7 +65,7 @@
 <p><strong>Under-optimise</strong>, and you'll build fragile and ad-hoc architectures that buckle under the first real load, forcing expensive rewrites that could have been avoided.</p>
 <p>There's a third trap worth naming: <strong>&quot;career-driven development&quot;</strong>. We've all seen it ... the choice to adopt a hot new technology not because it solves a real problem, but because it looks good on LinkedIn. These decisions are costly, and they're more common than we'd like to admit.</p>
 <h3>A Different Path</h3>
-<p>This article offers a different path, built on one principle: <strong>defer the database, not the design</strong>. Model the problem first. Understand how it will be accessed. Then choose storage later — when the constraints are clear and the costs are justified.</p>
+<p>This article offers a different path, built on one principle: <strong>defer the database, not the design</strong>. Model the problem first. Understand how it will be accessed. Then choose storage later, once the constraints are clear and the costs are justified.</p>
 <p>The mechanism that makes this possible? <strong>Your data layer</strong>.</p>
 <hr />
 <h2>Data Modelling: The Foundation</h2>
@@ -190,21 +190,22 @@
 <li>Do create the structure that allows future evolution</li>
 <li>This distinction is everything</li>
 </ul>
-<h3>A Pattern I've Seen Repeatedly</h3>
-<p>I've worked on multiple systems where this philosophy was either followed or ignored. The contrast is stark.</p>
-<h4>The Multi-Database Trap</h4>
-<p>An early-stage product used MySQL, MongoDB, and other databases for different features. Each choice seemed logical at the time. Different tools for different jobs.</p>
-<p>But when analytics requirements emerged (they always do), joining data across systems became a costly nightmare. <strong>Months were spent building ETL pipelines and synchronisation layers</strong> that a unified data layer would have avoided entirely.</p>
-<h4>The Boring-Tech Winner</h4>
-<p>A high-throughput transaction processing system built with a standard web framework and SQL. Nothing exotic.</p>
-<p>It achieved <strong>low-latency performance</strong> by understanding its touchpoints and building a clean data layer from the start. When scale demands grew, the abstraction made evolution straightforward:</p>
-<ul>
-<li>Read replicas were added</li>
-<li>Indexes were optimised</li>
-<li>High-volume touchpoints were migrated to specialized storage</li>
-<li>All without rewriting the application</li>
-</ul>
-<p><strong>The lesson</strong>: Premature technology diversity costs more than premature optimisation.</p>
+<h3>A Cautionary (and Expensive) Tale</h3>
+<p>In a previous company, we built a sophisticated record processing system on top of an ORM, without a well-defined data layer; a very common pattern. The data model consisted of &quot;magic objects&quot;: ORM-specific query and filter clauses that leaked throughout the application, binding us tightly to a single-instance database.</p>
+<p>At the time, I argued for retrofitting a proper data layer. As is common in business, there was always something more important to do, and the decision was endlessly deferred.</p>
+<p>The product was also single-tenanted.</p>
+<h4>What Happened?</h4>
+<p>It grew. We added clients. Because the data model was inseparable from the ORM and its single-instance assumptions, migrating to a multi-tenanted storage solution simply was not viable. Instead, we duplicated the entire infrastructure stack for each new client.</p>
+<p>We had extremely talented SREs who worked magic with Kubernetes, shuffling containers between hosts to manage the load. But we were running roughly ten containers per client: web server, workers, database primary, standby, read replica, Elasticsearch cluster. Multiplied across hundreds of clients.</p>
+<p>The operational and development cost of maintaining this conservatively ran to millions of dollars more than a multi-tenanted architecture would have required.</p>
+<p>Every year.</p>
+<p>Had a clean data layer been in place from the start, the exit route would have existed. Two migration steps, each self-contained:</p>
+<p><strong>Step 1: Migrate storage to shared infrastructure.</strong> Each client's application still runs separately, but the database layer is consolidated. Ten containers per client drops to one or two. The majority of the operational cost is gone before a single line of application code is touched.</p>
+<p><strong>Step 2: Migrate the application to multi-tenanted.</strong> With the infrastructure pressure gone, consolidating the application itself becomes a focused project rather than an emergency rewrite.</p>
+<h4>The Lesson</h4>
+<p>The data layer was not a missing abstraction nicety. It was the only thing that would have kept the exit route open. Without it, every new client made the problem slightly worse and the fix slightly less affordable. By the time the cost was undeniable, it had become more expensive to fix than to absorb.</p>
+<p>Deferred decisions are not free. They accrue interest, quietly, until the bill arrives.</p>
+<p>So where do you start?</p>
 <h3>Start Simple</h3>
 <p>Default to <strong>boring, proven technology</strong>:</p>
 <ul>
@@ -221,14 +222,72 @@
 <li><strong>Optimisation is cheap</strong> when you're small</li>
 </ul>
 <p>Adding an index or a read replica is a day's work, not a quarter-long migration project.</p>
-<h3>The Evolution in Pictures</h3>
-<p>The same data layer at three stages of scale. The interface never changes — only what lives behind it does.</p>
+<h3>The Evolution</h3>
+<p>The interface and application code are fixed from day one:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ProductProvider</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
+        <span class="k">pass</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ProductSearchHandler</span><span class="p">:</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">products</span><span class="p">:</span> <span class="n">ProductProvider</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_products</span> <span class="o">=</span> <span class="n">products</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_products</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">country_code</span><span class="p">)</span>
+</pre></div>
+<p>Everything that follows is what lives behind that interface.</p>
+<p><em>In practice, the interface will evolve as requirements grow; new methods, refined signatures. But that evolution is bounded: changes happen in one place, each provider can be tested in isolation, and the application code is never entangled with storage decisions.</em></p>
 <p><strong>Stage 1: The boring monolith.</strong> One database. Handles the vast majority of real-world products.</p>
-<div class="mermaid-diagram"><img src="defer-the-database-not-the-design/mermaid-27a3b674bfa53f58.svg" alt="Mermaid diagram"></div>
-<p><strong>Stage 2: Augmented.</strong> A search touchpoint outgrows PostgreSQL. ElasticSearch is introduced behind the data layer. The application is unchanged.</p>
-<div class="mermaid-diagram"><img src="defer-the-database-not-the-design/mermaid-fbb95f85275acd98.svg" alt="Mermaid diagram"></div>
-<p><strong>Stage 3: Federated at scale.</strong> Regional sharding, dedicated client infrastructure, a proxy layer for routing. The application still sees the same data layer interface.</p>
-<div class="mermaid-diagram"><img src="defer-the-database-not-the-design/mermaid-3bc0d0aaa33856a3.svg" alt="Mermaid diagram"></div>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SQLProductProvider</span><span class="p">(</span><span class="n">ProductProvider</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+            <span class="s2">&quot;SELECT * FROM product WHERE name ILIKE </span><span class="si">%s</span><span class="s2"> AND country_code = </span><span class="si">%s</span><span class="s2">;&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;%</span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">,</span> <span class="n">country_code</span><span class="p">],</span>
+        <span class="p">)</span>
+
+<span class="n">products</span> <span class="o">=</span> <span class="n">SQLProductProvider</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">ProductSearchHandler</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
+</pre></div>
+<p><strong>Stage 2: Augmented.</strong> A search touchpoint outgrows PostgreSQL; requires specialised features. ElasticSearch is introduced behind the data layer. One new class; one line changes at startup. The application is unchanged:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ElasticProductProvider</span><span class="p">(</span><span class="n">ProductProvider</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
+        <span class="n">hits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_es</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">&quot;products&quot;</span><span class="p">,</span> <span class="n">query</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;match&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">query</span><span class="p">}})</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_to_product</span><span class="p">(</span><span class="n">hit</span><span class="p">)</span> <span class="k">for</span> <span class="n">hit</span> <span class="ow">in</span> <span class="n">hits</span><span class="p">[</span><span class="s2">&quot;hits&quot;</span><span class="p">][</span><span class="s2">&quot;hits&quot;</span><span class="p">]]</span>
+
+<span class="n">products</span> <span class="o">=</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">es</span><span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">ProductSearchHandler</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
+</pre></div>
+<p><strong>Stage 3: Federated at scale.</strong> Regional sharding, dedicated client infrastructure, a routing layer that directs queries to the right region or dedicated client backend. Some regions run shared PostgreSQL and ElasticSearch clusters; others have dedicated infrastructure for specific clients. A global PostgreSQL instance holds customer metadata and routing configuration. The application still calls <code>handle()</code> unchanged:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">RegionalProductProvider</span><span class="p">(</span><span class="n">ProductProvider</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">providers</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ProductProvider</span><span class="p">],</span>
+            <span class="n">default</span><span class="p">:</span> <span class="n">ProductProvider</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_providers</span> <span class="o">=</span> <span class="n">providers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_default</span> <span class="o">=</span> <span class="n">default</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
+        <span class="n">provider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_providers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">country_code</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">provider</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">country_code</span><span class="p">)</span>
+
+<span class="n">products</span> <span class="o">=</span> <span class="n">RegionalProductProvider</span><span class="p">(</span>
+    <span class="n">providers</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;US&quot;</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">us_es</span><span class="p">),</span>
+        <span class="s2">&quot;EU&quot;</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">eu_es</span><span class="p">),</span>
+        <span class="s2">&quot;GB&quot;</span><span class="p">:</span> <span class="n">SQLProductProvider</span><span class="p">(</span><span class="n">gb_db</span><span class="p">),</span>  <span class="c1"># dedicated client, still on SQL</span>
+    <span class="p">},</span>
+    <span class="n">default</span><span class="o">=</span><span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">global_es</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">ProductSearchHandler</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
+</pre></div>
 <h3>When to Evolve</h3>
 <p>Watch for <strong>clear signals</strong>, not hypotheticals:</p>
 <ul>
@@ -253,7 +312,7 @@
 </ul>
 <hr />
 <h2>Summary: The Real Competitive Advantage</h2>
-<p>Most teams think scalability is about picking the right database, but it's not ...</p>
+<p>Most teams think scalability is about picking the right database. It isn't.</p>
 <p><strong>It's about building a system that can evolve faster than the competition.</strong></p>
 <h3>The Hidden Cost of &quot;Best Practices&quot;</h3>
 <p>Microservices, event buses, and specialized databases all have their place. But adopting them early trades <strong>velocity for theoretical scale</strong>.</p>
@@ -265,20 +324,9 @@
 <li><strong>Never rewrite</strong> because your data layer absorbs the changes</li>
 </ol>
 <h3>The Final Insight</h3>
-<p>Most architecture advice tells you what to build. This article tells you what <strong>not</strong> to build ... yet.</p>
+<p>Most architecture advice tells you what to build. This article tells you what <strong>not</strong> to build yet.</p>
 <p><strong>That difference is worth millions in saved engineering time and preserved velocity.</strong></p>
 <p>Successful companies aren't building with fancier databases. They're succeeding by <strong>shipping faster</strong> whilst <strong>keeping their options open</strong>.</p>
-<hr />
-<h2>Appendix: Technology Reference</h2>
-<p>When you do need to evolve, here's a starting point for mapping touchpoints to technologies. This is not prescriptive.  Your constraints matter more than these labels.</p>
-<ul>
-<li><strong>Transactional (high volume)</strong>: Sharded / Distributed SQL — CitusDB, CockroachDB, Spanner, NewSQL</li>
-<li><strong>Analytical/Reporting</strong>: ClickHouse, TimescaleDB, or stay with PostgreSQL + read replicas</li>
-<li><strong>Graph traversal</strong>: Relational with recursive queries and smart indexing or specialised DBs (Neo4j, JanusGraph + Cassandra)</li>
-<li><strong>Full-text search</strong>: Elasticsearch, Meilisearch</li>
-<li><strong>High-throughput writes with predictable/restricted queries</strong>: Cassandra, ScyllaDB</li>
-<li><strong>Time-series</strong>: TimescaleDB, InfluxDB</li>
-</ul>
 
     </div>
 

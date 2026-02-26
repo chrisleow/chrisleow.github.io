@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategic Monolith + Satellites | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/strategic-monolith-satellites">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/agile-missing-layer-retrospective" rel="prev">
+                    <span class="meta-nav">&larr;</span> Agile&#39;s Missing Layer: The Organisational Retrospective
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/database-as-a-queue" rel="next">
+                    Your Database is Already a Queue <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Strategic Monolith + Satellites</h1>
+        <p class="post-meta">
+            <time datetime="2026-02-28">
+                February 28, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Most architecture discussions for new products begin with &quot;should this be a microservice&quot;? It is almost always the wrong first question. The right first question is: what needs to own state, and what just needs to do work?</p>
+<p>This article describes a topology for a single application: a monolithic core for state and orchestration, with satellites and data components at the boundary. Larger systems may comprise several of these; the architecture applies within each one. It is not a monolith-vs-microservices argument. It is a pattern that gives you distributed compute and specialised storage without distributed state ownership.</p>
+<hr />
+<h2>The Architecture</h2>
+<p>The architecture has three parts. Understanding what each one owns, and what it does not, is what makes the pattern work.</p>
+<p><strong>The monolithic core</strong> owns everything that matters: all persistent state, workflow, orchestration, business rules, and transition guards. It is the single source of truth. State changes happen here, decisions are made here, and when something goes wrong in production, this is where you look.</p>
+<p><strong>Satellites</strong> handle specialised compute. They are stateless (excluding local caches): they receive a request, do work, and return a result. They do not own the &quot;source of truth&quot; data and state.</p>
+<p><strong>Data components</strong> handle specialised storage concerns. They own a specific data touchpoint and expose a clean interface through the data layer. They are not peers to the core; they are ingredients behind an abstraction boundary.</p>
+<ul>
+<li>Elasticsearch for full-text search</li>
+<li>A graph database for relationship traversal</li>
+<li>A time-series store for metrics or sensor data</li>
+<li>A purpose-built service wrapping any of the above</li>
+</ul>
+<p>The core calls satellites directly: HTTP/RPC for latency-sensitive work, a database queue for anything that can wait. Data components are accessed through the data layer, which means the application never knows or cares what sits behind them.</p>
+<p><strong>The core can run concurrently.</strong> Multiple workers, thread pools, async frameworks; none of these require distributing your state. Concurrency is <em>not the same</em> as distribution, and the conflation of the two is one of the primary drivers of premature architectural complexity.</p>
+<div class="mermaid-diagram"><img src="0007-strategic-monolith-satellites/mermaid-a4dad507d7776184.svg" alt="Mermaid diagram"></div>
+<p>The benefits are direct consequences of the structure:</p>
+<ul>
+<li><strong>No distributed transactions.</strong> The core is the single source of truth; all state changes happen in one place.</li>
+<li><strong>No coordination headaches.</strong> You do not need consensus between services to make a decision.</li>
+<li><strong>Clear ownership.</strong> If something is wrong with the data, you know where to look.</li>
+<li><strong>Independently deployable boundaries.</strong> You can update the risk scoring model, swap the search backend, or replace a data component without touching the core.</li>
+<li><strong>Technology freedom at the boundary.</strong> Each component uses whatever suits its concern. The core does not care what is behind the interface.</li>
+</ul>
+<hr />
+<h2>Why &quot;Strategic&quot;?</h2>
+<p>&quot;Monolith&quot; carries baggage. It conjures images of tangled legacy systems that nobody wants to touch. This is not that.</p>
+<p>A strategic monolith is a deliberate architectural choice. It is monolithic in one specific sense: it owns all persistent state and all decision-making in a single deployable unit. It is not monolithic in the sense of being a <a href="https://www.laputan.org/mud/">ball of mud</a> with no internal structure.</p>
+<p>The internal structure matters. A well-factored monolith has clear module boundaries, a clean data layer, explicit dependency injection, and disciplined separation between orchestration and side effects. The code inside the core can be as well-organised as any microservice architecture; it simply does not pay the tax of distributed coordination.</p>
+<p>At a previous fintech company, I built a data orchestration system based on this exact pattern. Its responsibility was to accept a stream of incoming articles from upstream data extraction systems, store the source of truth, call satellite ML services to clean data and link related records, maintain audit logs and history, and publish the results to a downstream search system for client consumption.</p>
+<p>That system has operated without complaint for nearly a decade. It requires next to no maintenance, is easy for developers to understand and work with, and has processed hundreds of millions of source data points. It supports many tens of millions of dollars of revenue to this day (at time of writing).</p>
+<p>The strategic value is optionality. A monolith with clean internal boundaries can be decomposed later if genuine scaling constraints demand it. A prematurely distributed system, by contrast, is extremely expensive to re-consolidate. The asymmetry is stark: splitting a well-structured monolith is a bounded project; reunifying distributed state is often a rewrite.</p>
+<hr />
+<h2>Earning Satellite Status</h2>
+<p>The instinct to extract services is strong. Resist it until the justification is concrete.</p>
+<p>A satellite earns its place on one of two grounds:</p>
+<ul>
+<li><strong>Resource weight.</strong> The work is genuinely heavy: ML inference, OCR, complex document processing. Running it in-process would starve the core of resources (CPU cycles, memory or other).</li>
+<li><strong>Independent deployment.</strong> The satellite has its own release cycle. An ML model retraining weekly should not require a full application deployment.</li>
+</ul>
+<p><strong>Team ownership</strong> can reinforce the case for extraction, but it is not a standalone justification. A data science team owning an ML model that is already heavy and independently deployed? That is all reasons pointing the same way. A separate team working on lightweight business logic that deploys on the same cadence? That is a module boundary, not a service boundary. Be cautious here: &quot;we have a separate team, therefore we need a separate service&quot; is how most premature splits get justified.</p>
+<p>Everything else stays in the core as ordinary function calls. Sending an email, generating a PDF, calling a simple REST API, formatting a webhook payload: these are application code. They do not need a service boundary, a queue, or a deployment pipeline of their own.</p>
+<p>The test is simple: if you extracted it, would you need to solve any distributed systems problems that do not currently exist? If the answer is yes, the extraction cost is real and the benefit must be proportional.</p>
+<hr />
+<h2>The Ingredients Follow from the Architecture</h2>
+<p>Once the topology is clear, the stack choices become obvious.</p>
+<p><strong>Start with a relational database.</strong> Almost every early-stage product should. A single PostgreSQL instance handles transactional, analytical, search, and even graph workloads adequately until you have genuinely outgrown it. The instinct to reach for a document store, a graph database, or a time-series store before you understand your access patterns is one of the most expensive mistakes a team can make. Think hard before introducing a second storage technology. The reasoning behind this is expanded in <a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>.</p>
+<p>For side projects, MVPs, and embedded tooling, <a href="/posts/sqlite-secret-weapon">SQLite</a> carries zero operational overhead and is considerably more capable than most engineers expect.</p>
+<p><strong>A clean data layer</strong> is the abstraction that holds the architecture together. It insulates the application from storage decisions, makes each component independently testable, and keeps the exit route open when a touchpoint eventually outgrows its current backend. The full pattern is described in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>.</p>
+<p><strong>A database-backed queue</strong> is the right tool when work needs async processing or needs to call a satellite at a controlled rate; not a message broker, but a table with a few index tricks. This is covered in depth in <a href="/posts/your-database-is-already-a-queue">Your Database is Already a Queue</a>.</p>
+<p>Each ingredient is swappable because the data layer insulates the application from the storage choice beneath it. You add them when the constraints demand it, not when a blog post tells you to.</p>
+<hr />
+<h2>In Practice: KYC Onboarding</h2>
+<p>KYC (Know Your Customer) onboarding is a good illustration because the satellite interactions are varied and the boundaries are clear. The same pattern applies to any workflow with side effects that cross a process boundary.</p>
+<p>The core owns the workflow: the states a KYC check moves through (<code>SUBMITTED</code> → <code>PROCESSING</code> → <code>APPROVED</code> / <code>REJECTED</code> / <code>REFERRED</code>), the transitions between them, and the rules for what triggers each one.</p>
+<p>The interesting architectural question is what lives outside the core, and why.</p>
+<p><strong>Document verification</strong> is a satellite. It runs an ML model against uploaded identity documents: comparing faces, validating holograms, checking for tampering. The compute is genuinely heavy and the model has its own release cycle. It earns satellite status on both grounds.</p>
+<p><strong>Risk scoring</strong> is a satellite. It takes customer data and returns a score. The model is complex, independently deployable, and the compute cost justifies separation.</p>
+<p><strong>Document correlation</strong> is a satellite. It matches uploaded documents against a large corpus using embedding-based similarity search: generating vectors from document content, querying a high-dimensional index, and scoring candidates for duplication or known fraud patterns. The compute is heavy, and the embeddings and corpus update on their own cycle.</p>
+<p><strong>Sending a welcome email</strong> on approval is not a satellite. An <code>email.send(...)</code> call to an SMTP library or a simple API client is just application code. The monolith handles it without ceremony. The instinct to extract every side effect into a service is one of the most common sources of unnecessary architectural complexity.</p>
+<p>The <strong>data layer</strong> sits behind the provider that stores KYC checks. Whether the checks live in PostgreSQL, migrate to a separate compliance datastore, or are shadowed across two systems during a transition is entirely hidden from the orchestration code. The application does not change when the storage does.</p>
+<hr />
+<h2>What This Is Not</h2>
+<p><strong>Not a microservices takedown.</strong> The architecture tells you when to distribute; it does not tell you never to. When a satellite or data component genuinely needs to be a separate service, the architecture already accommodates it. The difference is that the decision is made at the boundary, not by default.</p>
+<p><strong>Not a constraint on concurrency.</strong> The core scales vertically and horizontally with read replicas, worker pools, and connection pooling long before distribution becomes necessary. Scalability is a data layer concern, not an architecture topology concern; see <a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>.</p>
+<p><strong>Not inflexible.</strong> A special-case touchpoint that genuinely needs a graph database or a time-series store becomes a data component: introduced behind the data layer, on its own schedule, without touching the application. Nothing stops you writing a purpose-built service to wrap it; just treat it as a data component, not a peer.</p>
+<p><strong>Not a claim about entire platforms.</strong> This architecture describes a single application. Larger systems, particularly multi-stage data processing pipelines, may comprise several applications, each following this pattern independently with its own core and satellites. The boundaries between those applications are genuine service boundaries; the point is that the boundaries within each one usually are not.</p>
+<p><strong>Not the last word.</strong> The architecture gives you a clear signal for when to evolve: when a specific touchpoint is demonstrably breaking under load, and not before.</p>
+<hr />
+<h2>Testing</h2>
+<p>A common objection to the monolith is that it becomes hard to test as it grows. The opposite is true if the architecture is right. Two things make this work: an explicit dependency context that makes unit and integration testing simple, and architecture tests that prevent the structure from eroding.</p>
+<h3>The <code>Context</code> Object</h3>
+<p>All dependencies are bundled into a single <code>Context</code> object and injected at startup. The data layer, the satellites, and any other collaborators are all accessed through it:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Context</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="n">repositories</span><span class="p">:</span>  <span class="n">Repositories</span>
+    <span class="n">verification</span><span class="p">:</span>  <span class="n">VerificationService</span>
+    <span class="n">risk_scoring</span><span class="p">:</span>  <span class="n">RiskScoringService</span>
+    <span class="n">correlation</span><span class="p">:</span>   <span class="n">CorrelationService</span>
+</pre></div>
+<p><code>repositories</code> is itself a container of data layer providers (KYC checks, customers, documents); its contents are swappable independently, just as the satellites are. The entire execution context of the application is captured in a single object.</p>
+<p>In tests, you construct a <code>Context</code> with fakes for every dependency rather than mocking individual calls. Every component is independently substitutable, and the fakes can be feature-complete implementations rather than brittle mock expectations. The monolith becomes easy to reason about: the <code>Context</code> is the complete list of things the application depends on, and nothing is hidden.</p>
+<p>This is a direct consequence of the architecture. Because the core accesses satellites through injected services and storage through the data layer, there are no hidden dependencies to stub out and no global state to manage. A test that constructs a <code>Context</code> with fakes has the same shape as production; the only difference is what sits behind the interfaces.</p>
+<h3>Prefer Fakes over Mocks</h3>
+<p>A mock verifies that a specific method was called with specific arguments. A fake is a lightweight, working implementation of the same interface.</p>
+<p>Mocks test <em>implementation</em>: did the code call <code>verification.verify()</code> with the right customer ID? Fakes test <em>behaviour</em>: given this customer, does the workflow produce the right outcome? When you refactor the internals of a transition, mock-based tests break even if the behaviour is unchanged. Fake-based tests only break if the behaviour actually changes.</p>
+<p>A fake is written once, maintained along with the dependency and shared across the entire test suite. It is a real implementation: it accepts the same types, returns the same types, and behaves predictably. When the interface changes, the fake fails to compile rather than silently passing with a stale mock expectation.</p>
+<p>Oleksii at <a href="https://tyrrrz.me/">tyrrrz.me</a> has <a href="https://tyrrrz.me/blog/fakes-over-mocks">made this argument in depth</a>, definitely worth reading!</p>
+<p>The <code>Context</code> pattern makes this practical. Because every dependency enters through a single object, building a test context is one constructor call:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">make_test_context</span><span class="p">(</span><span class="o">**</span><span class="n">overrides</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Context</span><span class="p">:</span>
+    <span class="n">defaults</span> <span class="o">=</span> <span class="n">Context</span><span class="p">(</span>
+        <span class="n">repositories</span><span class="o">=</span><span class="n">FakeRepositories</span><span class="p">(),</span>
+        <span class="n">verification</span><span class="o">=</span><span class="n">FakeVerificationService</span><span class="p">({}),</span>
+        <span class="n">risk_scoring</span><span class="o">=</span><span class="n">FakeRiskScoringService</span><span class="p">(</span><span class="n">default_score</span><span class="o">=</span><span class="mi">50</span><span class="p">),</span>
+        <span class="n">correlation</span><span class="o">=</span><span class="n">FakeCorrelationService</span><span class="p">(),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">defaults</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="o">**</span><span class="n">overrides</span><span class="p">)</span>
+</pre></div>
+<p>Each test overrides only the dependencies it cares about. The rest are sensible defaults. No mock framework, no patching, no cleanup.</p>
+<h3>Guarding the Boundaries</h3>
+<p>A monolith with clean internal structure and a monolith that has decayed into a ball of mud are architecturally identical from the outside. The difference is entirely internal, and internal structure erodes quietly. A new developer takes a shortcut across a module boundary. A rushed feature bypasses the data layer and queries the database directly. Over six months with three teams, the well-factored core becomes the tangled system this architecture was designed to prevent.</p>
+<p>Architecture tests are the countermeasure. They are automated checks, run in CI alongside your unit tests, that enforce structural rules about what code is allowed to depend on what.</p>
+<p>The rules that matter most for this architecture:</p>
+<ul>
+<li><strong>Data layer enforcement.</strong> Application code must access storage through the data layer, never directly. No raw SQL in workflow code, no ORM imports outside the provider implementations.</li>
+<li><strong>Module isolation.</strong> Each module exposes a public interface. Other modules may depend on that interface but not on its internals. This is the boundary that prevents a monolith from becoming a distributed monolith in a single process.</li>
+<li><strong>Satellite independence.</strong> Satellite code must not import from the core's internals. If a satellite needs something from the core, it receives it as a parameter or through a defined contract.</li>
+</ul>
+<p>A simple approach in Python is a test that walks the import graph:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_workflows_do_not_bypass_data_layer</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;src/workflows&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">&quot;*.py&quot;</span><span class="p">):</span>
+        <span class="n">imports</span> <span class="o">=</span> <span class="n">get_imports</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">imports</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="n">module</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;src.storage&quot;</span><span class="p">),</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2"> imports </span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2"> directly; use the data layer&quot;</span>
+            <span class="p">)</span>
+</pre></div>
+<p>The implementation of <code>get_imports</code> is a few lines of <code>ast.parse</code>; the point is not the tooling but the habit. In Java, <a href="https://www.archunit.org/">ArchUnit</a> is the standard. In Python, <a href="https://import-linter.readthedocs.io/">import-linter</a> does the same job declaratively. The specific tool matters less than the principle: if a boundary is important enough to draw on a diagram, it is important enough to test in CI.</p>
+<p>These tests are cheap to write, fast to run, and pay for themselves the first time a pull request breaks a boundary that would otherwise have gone unnoticed until it caused a production incident. With multiple teams contributing to the same monolith, they are not optional.</p>
+<hr />
+<h2>Deviations are Possible</h2>
+<p>This architecture is a starting point, not a straitjacket. Real systems accumulate history, constraints, and decisions made before any article existed. Sometimes the right answer is a pragmatic deviation.</p>
+<p>Some satellites will be less stateless than you would like. Some data components will blur the line with the core. Some boundaries that look clean on a diagram will be messier in code. This is fine, and to be expected.</p>
+<p>The point is not purity. It is deliberateness. When you deviate, do it consciously and with a clear reason. Know what you are giving up and document it. A system held together with a bit of pragmatic tape and clear documentation beats a pristine architecture that ships six months late.</p>
+<p>The architecture gives you a default. Defaults are valuable precisely because they tell you when you are departing from them.</p>
+<hr />
+<h2>Summary</h2>
+<p>Logically distribute compute, not state.</p>
+<p>A monolithic core with satellites and data components gives you the scaling benefits of distributed systems without the coordination overhead. The core owns all domain state and orchestration. Satellites handle heavy, independently deployable functions. Data components handle specialised storage behind the data layer. The bar for extraction is concrete: resource weight or independent deployment.</p>
+<p>Start with a relational database, add ingredients when the constraints demand it, and keep the exit routes open.</p>
+<p>The rest of the series builds on this foundation:</p>
+<ul>
+<li><a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>: the abstraction that makes the architecture work</li>
+<li><a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>: how to evolve the ingredients without rewriting the application</li>
+<li><a href="/posts/your-database-is-already-a-queue">Your Database is Already a Queue</a>: what async processing looks like within this architecture</li>
+<li><em>Your System is a State Machine</em>: the mental model that makes this topology obvious</li>
+<li><em>Events vs Signals</em>: what goes wrong when you reach for a broker before you have earned it</li>
+<li><em>Idempotency is Not Optional</em>: the discipline that makes state transitions safe</li>
+<li><em>Audit Trails Done Properly</em>: how to capture and query the record of what happened</li>
+</ul>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/agile-missing-layer-retrospective" rel="prev">
+                    <span class="meta-nav">&larr;</span> Agile&#39;s Missing Layer: The Organisational Retrospective
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/database-as-a-queue" rel="next">
+                    Your Database is Already a Queue <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

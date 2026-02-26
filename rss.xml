@@ -11,6 +11,22 @@
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
     
     <item>
+        <title>Strategic Monolith + Satellites</title>
+        <link>https://chrisfrequency.com/posts/strategic-monolith-satellites</link>
+        <pubDate>Sat, 28 Feb 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/strategic-monolith-satellites</guid>
+        <description><![CDATA[Most architecture discussions for new products begin with "should this be a microservice"? It is almost always the wrong first question. The right first question is: what needs to own state, and what just needs to do work? This article describes a topology...]]></description>
+    </item>
+    
+    <item>
+        <title>Your Database is Already a Queue</title>
+        <link>https://chrisfrequency.com/posts/database-as-a-queue</link>
+        <pubDate>Thu, 26 Feb 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/database-as-a-queue</guid>
+        <description><![CDATA["Don't use your database as a queue" is one of those pieces of engineering orthodoxy that gets repeated so often it starts to feel like a law. It isn't. It's a guideline with a scale constraint attached, and for most workloads that constraint is never...]]></description>
+    </item>
+    
+    <item>
         <title>Agile&#39;s Missing Layer: The Organisational Retrospective</title>
         <link>https://chrisfrequency.com/posts/agile-missing-layer-retrospective</link>
         <pubDate>Sat, 21 Feb 2026 00:00:00 GMT</pubDate>

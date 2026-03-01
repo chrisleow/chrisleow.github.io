@@ -16,7 +16,7 @@
             <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
             <nav>
                 <a href="https://chrisfrequency.com/" class="">Home</a>
-                <a href="https://chrisfrequency.com/about" class="">About</a>
+                <a href="https://chrisfrequency.com/consulting" class="">Consulting</a>
             </nav>
         </header>
 
@@ -28,8 +28,8 @@
     <nav class="post-navigation post-navigation-top">
         <div class="nav-previous">
             
-                <a href="https://chrisfrequency.com/posts/introducing-the-resonance-protocol" rel="prev">
-                    <span class="meta-nav">&larr;</span> Introducing the Resonance Protocol
+                <a href="https://chrisfrequency.com/posts/ai-wont-say-no-problem" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your AI Won&#39;t Say No ... And Why That&#39;s a Problem
                 </a>
             
         </div>
@@ -47,8 +47,8 @@
     <header class="post-header">
         <h1>Defer the Database, Not the Design</h1>
         <p class="post-meta">
-            <time datetime="2026-02-10">
-                February 10, 2026
+            <time datetime="2026-02-14">
+                February 14, 2026
             </time>
         </p>
     </header>
@@ -66,8 +66,6 @@
 <p>There's a third trap worth naming: <strong>&quot;career-driven development&quot;</strong>. We've all seen it ... the choice to adopt a hot new technology not because it solves a real problem, but because it looks good on LinkedIn. These decisions are costly, and they're more common than we'd like to admit.</p>
 <h3>A Different Path</h3>
 <p>This article offers a different path, built on one principle: <strong>defer the database, not the design</strong>. Model the problem first. Understand how it will be accessed. Then choose storage later, once the constraints are clear and the costs are justified.</p>
-<p>The mechanism that makes this possible? <strong>Your data layer</strong>.</p>
-<hr />
 <h2>Data Modelling: The Foundation</h2>
 <p>Data modelling is often treated as an &quot;also-ran&quot; in system design; something rushed through in favour of picking databases and frameworks. Yet it's arguably <strong>the most important architectural decision you'll make</strong>. Get the domain model right, and everything else becomes easier. Get it wrong, and you'll spend years fighting technical debt.</p>
 <h3>Storage-Agnostic Design</h3>
@@ -86,9 +84,10 @@
 <li><strong>Business-aligned</strong>: Focus on clarity and business alignment, not database schemas</li>
 </ul>
 <p>Consider a simple e-commerce system. Here's what storage-agnostic domain modelling looks like:</p>
+<p>These are schematic Python examples; imports, constructors and storage-specific row mapping are omitted.</p>
 <div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Product</span><span class="p">:</span>
     <span class="nb">id</span><span class="p">:</span> <span class="n">ProductId</span>
-    <span class="n">name</span><span class="p">:</span> <span class="n">string</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">price</span><span class="p">:</span> <span class="n">Money</span>
     <span class="n">inventory_count</span><span class="p">:</span> <span class="nb">int</span>
 
@@ -101,7 +100,7 @@
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Customer</span><span class="p">:</span>
     <span class="nb">id</span><span class="p">:</span> <span class="n">CustomerId</span>
-    <span class="n">email</span><span class="p">:</span> <span class="n">string</span>
+    <span class="n">email</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">shipping_addresses</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Address</span><span class="p">]</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">OrderItem</span><span class="p">:</span>
@@ -111,7 +110,6 @@
 </pre></div>
 <p>Notice what's missing: no database fields, no <code>save()</code> methods, no ORM annotations. Just clean domain concepts that model the business problem. These models don't know or care whether they'll live in PostgreSQL, MongoDB, or flat files. That's intentional.</p>
 <p>Storage decisions come later, after we understand touchpoints.</p>
-<hr />
 <h2>Data Touchpoints: Understanding Access Patterns</h2>
 <p>A <strong>touchpoint</strong> is how your system actually uses the data. Not &quot;what data exists&quot; but rather &quot;how is it accessed&quot;. This includes:</p>
 <ul>
@@ -158,7 +156,6 @@
 <li>A single PostgreSQL instance can handle transactional, analytical, and even graph workloads ... until it can't</li>
 </ul>
 <p><strong>The data layer ensures that &quot;until&quot; doesn't become a crisis.</strong></p>
-<hr />
 <h2>The Data Layer: Your Scaling Insurance</h2>
 <p>If you're unfamiliar with the concept of a data access layer, I've written about it in depth in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>.</p>
 <h3>The Provider Pattern (In Brief)</h3>
@@ -175,6 +172,7 @@
 <li>You can swap storage technologies without touching application logic</li>
 <li>When that analytical touchpoint outgrows PostgreSQL, you can introduce an analytics database behind the data layer whilst the application remains blissfully unaware</li>
 </ul>
+<p>This approach is sometimes formalised in a more theoretical way as &quot;hexagonal architecture&quot; or &quot;ports and adapters&quot;. The underlying principle is the same, arrived at here from practical experience rather than architectural prescription.</p>
 <h3>Your Insurance Policy</h3>
 <p>Think of the data layer as insurance:</p>
 <ul>
@@ -182,7 +180,6 @@
 <li>You're creating <strong>optionality</strong> for tomorrow</li>
 <li>It's your insurance against lock-in; technological, architectural, and strategic</li>
 </ul>
-<hr />
 <h2>The Scaling Pathway</h2>
 <p>The core philosophy is simple: <strong>defer decisions, not preparation</strong>.</p>
 <ul>
@@ -240,15 +237,31 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_products</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">country_code</span><span class="p">)</span>
 </pre></div>
 <p>Everything that follows is what lives behind that interface.</p>
+<div class="highlight ascii-art"><pre><span></span>  Stage 1 · boring monolith
+  <span class="c">┌─────┐</span>     <span class="c">┌──────────────────┐</span>     <span class="c">┌────────────┐</span>
+  <span class="c">│</span> App <span class="c">│────</span>▶<span class="c">│</span>   SQL provider   <span class="c">│────</span>▶<span class="c">│</span> PostgreSQL <span class="c">│</span>
+  <span class="c">└─────┘</span>     <span class="c">└──────────────────┘</span>     <span class="c">└────────────┘</span>
+
+  Stage 2 · augmented
+  <span class="c">┌─────┐</span>     <span class="c">┌──────────────────┐</span>     <span class="c">┌───────────────┐</span>
+  <span class="c">│</span> App <span class="c">│────</span>▶<span class="c">│</span> Elastic provider <span class="c">│────</span>▶<span class="c">│</span> Elasticsearch <span class="c">│</span>
+  <span class="c">└─────┘</span>     <span class="c">└──────────────────┘</span>     <span class="c">└───────────────┘</span>
+
+  Stage 3 · federated
+  <span class="c">┌─────┐</span>     <span class="c">┌──────────────────┐</span>     US <span class="c">──</span>▶ Elasticsearch
+  <span class="c">│</span> App <span class="c">│────</span>▶<span class="c">│</span>Regional provider <span class="c">│</span>     EU <span class="c">──</span>▶ Elasticsearch
+  <span class="c">└─────┘</span>     <span class="c">└──────────────────┘</span>     GB <span class="c">──</span>▶ PostgreSQL
+</pre></div>
 <p><em>In practice, the interface will evolve as requirements grow; new methods, refined signatures. But that evolution is bounded: changes happen in one place, each provider can be tested in isolation, and the application code is never entangled with storage decisions.</em></p>
 <p><strong>Stage 1: The boring monolith.</strong> One database. Handles the vast majority of real-world products.</p>
 <div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SQLProductProvider</span><span class="p">(</span><span class="n">ProductProvider</span><span class="p">):</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-            <span class="s2">&quot;SELECT * FROM product WHERE name ILIKE </span><span class="si">%s</span><span class="s2"> AND country_code = </span><span class="si">%s</span><span class="s2">;&quot;</span><span class="p">,</span>
-            <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;%</span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">,</span> <span class="n">country_code</span><span class="p">],</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+            <span class="s2">"SELECT * FROM product WHERE name ILIKE </span><span class="si">%s</span><span class="s2"> AND country_code = </span><span class="si">%s</span><span class="s2">;"</span><span class="p">,</span>
+            <span class="p">[</span><span class="sa">f</span><span class="s2">"%</span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">%"</span><span class="p">,</span> <span class="n">country_code</span><span class="p">],</span>
         <span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_to_product</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span>
 
 <span class="n">products</span> <span class="o">=</span> <span class="n">SQLProductProvider</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">ProductSearchHandler</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
@@ -257,8 +270,8 @@
 <div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ElasticProductProvider</span><span class="p">(</span><span class="n">ProductProvider</span><span class="p">):</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">country_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">]:</span>
-        <span class="n">hits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_es</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">&quot;products&quot;</span><span class="p">,</span> <span class="n">query</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;match&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">query</span><span class="p">}})</span>
-        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_to_product</span><span class="p">(</span><span class="n">hit</span><span class="p">)</span> <span class="k">for</span> <span class="n">hit</span> <span class="ow">in</span> <span class="n">hits</span><span class="p">[</span><span class="s2">&quot;hits&quot;</span><span class="p">][</span><span class="s2">&quot;hits&quot;</span><span class="p">]]</span>
+        <span class="n">hits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_es</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"products"</span><span class="p">,</span> <span class="n">query</span><span class="o">=</span><span class="p">{</span><span class="s2">"match"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">query</span><span class="p">}})</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_to_product</span><span class="p">(</span><span class="n">hit</span><span class="p">)</span> <span class="k">for</span> <span class="n">hit</span> <span class="ow">in</span> <span class="n">hits</span><span class="p">[</span><span class="s2">"hits"</span><span class="p">][</span><span class="s2">"hits"</span><span class="p">]]</span>
 
 <span class="n">products</span> <span class="o">=</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">es</span><span class="p">)</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">MyApplication</span><span class="p">(</span><span class="n">ProductSearchHandler</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
@@ -280,9 +293,9 @@
 
 <span class="n">products</span> <span class="o">=</span> <span class="n">RegionalProductProvider</span><span class="p">(</span>
     <span class="n">providers</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;US&quot;</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">us_es</span><span class="p">),</span>
-        <span class="s2">&quot;EU&quot;</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">eu_es</span><span class="p">),</span>
-        <span class="s2">&quot;GB&quot;</span><span class="p">:</span> <span class="n">SQLProductProvider</span><span class="p">(</span><span class="n">gb_db</span><span class="p">),</span>  <span class="c1"># dedicated client, still on SQL</span>
+        <span class="s2">"US"</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">us_es</span><span class="p">),</span>
+        <span class="s2">"EU"</span><span class="p">:</span> <span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">eu_es</span><span class="p">),</span>
+        <span class="s2">"GB"</span><span class="p">:</span> <span class="n">SQLProductProvider</span><span class="p">(</span><span class="n">gb_db</span><span class="p">),</span>  <span class="c1"># dedicated client, still on SQL</span>
     <span class="p">},</span>
     <span class="n">default</span><span class="o">=</span><span class="n">ElasticProductProvider</span><span class="p">(</span><span class="n">global_es</span><span class="p">),</span>
 <span class="p">)</span>
@@ -310,23 +323,9 @@
 <li><strong>Not locked into early decisions</strong></li>
 <li><strong>Proven by experience</strong>: Stack Overflow, GitHub, and Stripe all scaled this way; incrementally, deliberately, and without Hail Mary rewrites</li>
 </ul>
-<hr />
-<h2>Summary: The Real Competitive Advantage</h2>
-<p>Most teams think scalability is about picking the right database. It isn't.</p>
-<p><strong>It's about building a system that can evolve faster than the competition.</strong></p>
-<h3>The Hidden Cost of &quot;Best Practices&quot;</h3>
-<p>Microservices, event buses, and specialized databases all have their place. But adopting them early trades <strong>velocity for theoretical scale</strong>.</p>
-<p><em>Competitors that ship faster and defer these costs will beat you to market. And in most cases, they'll reach your scale before you've finished configuring Kubernetes.</em></p>
-<h3>The Pathway Gives You Both</h3>
-<ol>
-<li><strong>Ship fast</strong> with simple, boring tech</li>
-<li><strong>Evolve deliberately</strong> when constraints become clear</li>
-<li><strong>Never rewrite</strong> because your data layer absorbs the changes</li>
-</ol>
-<h3>The Final Insight</h3>
-<p>Most architecture advice tells you what to build. This article tells you what <strong>not</strong> to build yet.</p>
-<p><strong>That difference is worth millions in saved engineering time and preserved velocity.</strong></p>
-<p>Successful companies aren't building with fancier databases. They're succeeding by <strong>shipping faster</strong> whilst <strong>keeping their options open</strong>.</p>
+<h2>Summary</h2>
+<p>Model the domain first. Understand the access patterns. Then choose storage, once the constraints are real and the costs are justified.</p>
+<p>The data layer is what keeps the exit routes open. Microservices, event buses, and specialised databases all have their place; adopting them early trades velocity for theoretical scale. A clean data layer means the architecture can evolve precisely, one touchpoint at a time, without a rewrite and without the pressure of doing it as an emergency.</p>
 
     </div>
 
@@ -335,8 +334,8 @@
     <nav class="post-navigation post-navigation-bottom">
         <div class="nav-previous">
             
-                <a href="https://chrisfrequency.com/posts/introducing-the-resonance-protocol" rel="prev">
-                    <span class="meta-nav">&larr;</span> Introducing the Resonance Protocol
+                <a href="https://chrisfrequency.com/posts/ai-wont-say-no-problem" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your AI Won&#39;t Say No ... And Why That&#39;s a Problem
                 </a>
             
         </div>
@@ -351,20 +350,12 @@
     
 
 
-    
-    <hr class="collaborator-divider">
-    <div class="post-credits">
-        <span class="collaborator-prefix">🤝</span>
-        <em>Co-created with: </em>
-        <span class="collaborator-name">Claude</span>
-    </div>
-    
 </article>
 
         </main>
 
         <footer class="site-footer">
-            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/about">About</a> | <a href="https://www.linkedin.com/in/chris-leow-59856849/">LinkedIn</a> | <a href="https://chrisfrequency.com/rss.xml">RSS</a></p>
         </footer>
     </div>
 </body>

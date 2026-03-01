@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data-Driven Hallucinations | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/data-driven-hallucinations">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/asymmetric-architecture" rel="prev">
+                    <span class="meta-nav">&larr;</span> Asymmetric Architecture
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/expensive-in-age-of-ai" rel="next">
+                    What&#39;s Expensive in the Age of AI? <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Data-Driven Hallucinations</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-24">
+                March 24, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>The British advertising strategist Rory Sutherland <a href="https://www.goodreads.com/quotes/10450193-people-who-are-not-skilled-at-mathematics-tend-to-view">makes an observation</a> worth sitting with: most people, when trying to be rigorous, copy second-rate mathematicians. Second-rate mathematicians think mathematics is about numbers. First-rate mathematicians are barely interested in numbers at all.</p>
+<p>Look at what actually happens at the higher levels of the discipline. Abstract algebra, topology, category theory: these fields are almost entirely free of numbers. They deal in structures, relationships, and the properties that survive transformation. A number, when it appears, is almost an implementation detail. The real work is in asking the right question about the right structure.</p>
+<p>If your model of rigour is &quot;use more numbers&quot;, you have copied the wrong mathematicians.</p>
+<h2>The Cargo Cult</h2>
+<p>&quot;Data-driven&quot; entered the corporate lexicon as shorthand for &quot;not making decisions on gut feel&quot;. That was a legitimate reaction. Gut-feel decision-making at the executive level, where a single instinct can shape a quarter's priorities, is a real and costly dysfunction. The desire to ground decisions in evidence is sound.</p>
+<p>But somewhere along the way the phrase curdled. In practice, &quot;data-driven&quot; has come to mean something closer to:</p>
+<ul>
+<li>We have a dashboard, therefore we are rigorous</li>
+<li>We ran an A/B test, therefore the decision is correct</li>
+<li>The metric went up, therefore we succeeded</li>
+</ul>
+<p>None of these are wrong exactly. But they share a hidden assumption: that the right questions are already being asked. They take the question as given and reach straight for the instrument.</p>
+<p>A/B testing is a good example. It is a genuinely useful tool; controlled experiments are one of the few ways to make a credible causal claim from product data. But an A/B test can only optimise within your current idea space. It finds the local maximum of the thing you thought to test. You will never A/B test your way to a fundamentally different product, because that would require asking a different question first.</p>
+<p>This points at something deeper. Statistics surfaces correlation. What you need, almost always, is causality: not just that a single metric went up after a model retrain, but <em>why</em>. Was it leveraging a previously untapped feature? Was it ignoring dirty data that previously confused results? Armed with a metric alone, one might have very different ideas about what to build next, none of which the metric can surface. Causality requires a hypothesis about mechanism. You have to think about why something would work before you can design a meaningful test of it, and make decisions about what to build. The thinking precedes the measurement. Data cannot supply the hypothesis; it can only evaluate one.</p>
+<h2>Metrics Define What Exists</h2>
+<p>The deeper problem is not that the wrong questions are being asked. It is that the measurement system does not just track reality: it <strong>constitutes</strong> what is real within the organisation. Things that are not measured do not surface as concerns. They accumulate invisibly.</p>
+<p>Goodhart's Law gets cited here often: &quot;when a measure becomes a target, it ceases to be a good measure&quot;. That explains what happens to a metric once it is targeted. But the prior failure is choosing the metric in the first place. That choice defines the problem space. It determines which things can appear as issues and which cannot.</p>
+<p>A single-metric organisation is not just optimising the wrong thing. It is structurally incapable of seeing the things it is not measuring.</p>
+<h2>ARR and the Invisible Debt</h2>
+<p>I spent several years working on a highly complex data processing system. The dominant metric was ARR growth (Annual Recurring Revenue), which in daily decision-making meant one question: &quot;can we sell it?&quot;</p>
+<p>Technical compromises were made freely, because there was no mechanism to surface their cost against a metric that only asked whether the product could close deals. The system ended up supporting many customers in a genuinely poor technical state. The cleanup cost in the low millions of dollars every year in ongoing infrastructure and maintenance costs, and many millions of dollars more in opportunity cost every year as the difficulty of product improvement cost the business clients; potentially more than the short-term ARR uplift that justified the original compromises.</p>
+<p>The number went up. The decisions looked correct. The damage was real but off the ledger.</p>
+<p>The problem was not laziness or incompetence. The team was capable and working hard. The problem was that ARR was the only question being asked, so everything else was structurally invisible. Technical health had no representation in the measurement system and could not surface as a concern; the metric had no language for it.</p>
+<p>This was also a <em>complex</em> data processing system. Complexity compounds technical debt in ways a simpler system does not. A CRUD application can survive a lot of shortcuts; a data pipeline cannot. The metric did not know that, and nothing in the measurement system asked it to.</p>
+<p>The problem space had been artificially collapsed.</p>
+<h2>Think Before You Instrument</h2>
+<p>The tempting response is to measure more things. Add technical health to the dashboard. Track debt alongside ARR. This is better than a single metric, but it is still the same mistake: it treats the question as secondary to the instrument.</p>
+<p>The first job is to think. To play with the idea before you instrument it. To ask: what are we actually trying to understand here? What would change our minds?</p>
+<p>Sutherland calls this alchemy: pursuing interventions that work for reasons you cannot yet fully articulate. That is not unscientific. It is how you find the right question. Intuition, qualitative judgment, customer conversations, code review friction, a founder's sense that something is structurally wrong: these are legitimate inputs. They belong before the dashboard, not after it.</p>
+<p>Form the hypothesis before you build the metric. Know what you are testing before you write the instrumentation. The question is the expensive part; data is relatively cheap once you know what you are looking for.</p>
+<h2>Data-Informed</h2>
+<p>First-rate mathematicians are not anti-numbers. They use numbers when numbers are the right tool. The discipline is knowing when that is.</p>
+<p>&quot;Data-informed&quot; rather than &quot;data-driven&quot; is not a subtle distinction. It is about sequence. The question comes first. The metric serves the question. When the question is answered, the metric has done its job.</p>
+<p>This means treating qualitative signals as data: support tickets, user interviews, engineering team friction, the things people stop doing without telling anyone. It means holding a measurement with appropriate scepticism when it disagrees with a strong qualitative signal; sometimes the metric is wrong, or is measuring the wrong thing, or is failing to capture a dynamic that is real but hard to quantify.</p>
+<p>And it means, at the organisational level, returning to the question itself on a regular cadence. <a href="/posts/agile-missing-layer-retrospective">The organisational retrospective</a> is a good mechanism for this: a structured opportunity to ask not just &quot;did the metric move?&quot; but &quot;are we still asking the right question?&quot;.</p>
+<p>The measurement system answers the questions you give it. Choosing the questions is the work that cannot be automated.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/asymmetric-architecture" rel="prev">
+                    <span class="meta-nav">&larr;</span> Asymmetric Architecture
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/expensive-in-age-of-ai" rel="next">
+                    What&#39;s Expensive in the Age of AI? <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

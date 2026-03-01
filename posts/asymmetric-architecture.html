@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asymmetric Architecture | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/asymmetric-architecture">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/three-rewrites-every-startup-does" rel="prev">
+                    <span class="meta-nav">&larr;</span> The Three Rewrites Every Startup Does
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/data-driven-hallucinations" rel="next">
+                    Data-Driven Hallucinations <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Asymmetric Architecture</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-22">
+                March 22, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Every system has a shape. Most architecture diagrams hide it.</p>
+<p>Pick up any book on software architecture. Open any YouTube video on system design. The diagrams all share a visual assumption: components are roughly equal in size, connected uniformly, each deserving roughly the same amount of attention.</p>
+<p>Hexagonal architecture shows a hexagon at the centre with evenly-spaced ports around the perimeter. N-tier diagrams show three clean horizontal bands. Microservices diagrams show a grid of similarly-sized boxes connected by arrows:</p>
+<div class="highlight ascii-art"><pre><span></span><span class="c">┌─────────────┐</span>   <span class="c">┌─────────────┐</span>   <span class="c">┌─────────────┐</span>
+<span class="c">│</span>    Users    <span class="c">│</span>   <span class="c">│</span>   Orders    <span class="c">│</span>   <span class="c">│</span>  Payments   <span class="c">│</span>
+<span class="c">└─────────────┘</span>   <span class="c">└─────────────┘</span>   <span class="c">└─────────────┘</span>
+
+<span class="c">┌─────────────┐</span>   <span class="c">┌─────────────┐</span>   <span class="c">┌─────────────┐</span>
+<span class="c">│</span>  Shipping   <span class="c">│</span>   <span class="c">│</span>  Inventory  <span class="c">│</span>   <span class="c">│</span>   Emails    <span class="c">│</span>
+<span class="c">└─────────────┘</span>   <span class="c">└─────────────┘</span>   <span class="c">└─────────────┘</span>
+</pre></div>
+<p>The visual language implies a kind of <strong>structural democracy</strong>: every part of the system is a peer.</p>
+<p>This is a convention of the medium. It is not a description of reality.</p>
+<h2>What Systems Actually Look Like</h2>
+<p>Most operations in a real system are simple. Updating a user's notification preferences. Changing a password. Fetching a configuration record. Looking up an account balance. These are, in the main, a read or a write against a well-understood record. They require correctness, but not complexity.</p>
+<p>Then there is the <strong>dominant workflow</strong>: the thing the system actually exists to do.</p>
+<p>In a KYC platform, it is onboarding: the workflow that accepts a customer, orchestrates document verification, runs risk scoring, evaluates the results, makes a decision, and notifies downstream systems. In a lending product, it is loan origination: credit assessment, affordability checks, fraud screening, offer generation, acceptance, and drawdown. In a logistics platform, it is dispatch: route optimisation, driver assignment, constraint resolution, live re-routing, and the cascade of updates that follows each change. In an e-commerce system, it is order fulfilment: inventory reservation, payment authorisation, warehouse coordination, shipping, and the unhappy paths for each.</p>
+<p>These workflows are not one operation among many. They are the reason the system exists. And they are disproportionately complex: they call external services, manage state across multiple steps, handle failures and retries, enforce business rules, and produce audit trails. A payment flow is not five times more complex than a password reset. It is an order of magnitude more complex.</p>
+<p>If you drew a system diagram where the size of each component was proportional to its complexity, it would look nothing like the diagrams in the books:</p>
+<div class="highlight ascii-art"><pre><span></span><span class="c">┌──────────────────────────────────────┐</span>   <span class="c">┌───────────┐</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">│</span>  Change   <span class="c">│</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">│</span> password  <span class="c">│</span>
+<span class="c">│</span>          Order fulfilment            <span class="c">│</span>   <span class="c">└───────────┘</span>
+<span class="c">│</span>                                      <span class="c">│</span>
+<span class="c">│</span>  inventory · payment · warehouse ·   <span class="c">│</span>   <span class="c">┌───────────┐</span>
+<span class="c">│</span>  shipping · retries · audit trail    <span class="c">│</span>   <span class="c">│</span>  Update   <span class="c">│</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">│</span> settings  <span class="c">│</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">└───────────┘</span>
+<span class="c">│</span>                                      <span class="c">│</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">┌───────────┐</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">│</span>   Fetch   <span class="c">│</span>
+<span class="c">│</span>                                      <span class="c">│</span>   <span class="c">│</span>  profile  <span class="c">│</span>
+<span class="c">└──────────────────────────────────────┘</span>   <span class="c">└───────────┘</span>
+</pre></div>
+<p>Lopsided. Asymmetric. That is the real shape of most systems.</p>
+<h2>The Mental Model Trap</h2>
+<p>The diagram convention would be harmless if it were just a drawing shortcut. The problem is that it shapes thinking.</p>
+<p>&quot;Be consistent&quot; is, in general, good advice. Applied at the level of function naming, error handling, or test structure, it reduces friction and makes codebases easier to navigate. <strong>Applied at the level of architecture, it becomes a trap:</strong> the instinct to give every part of the system the same structural treatment, regardless of whether the parts are remotely similar in complexity or purpose.</p>
+<p>The result is familiar. Teams extract a service for password reset because they extracted a service for onboarding, and consistency demands uniformity. Simple CRUD operations acquire queues, contracts, and deployment pipelines because the dominant workflow needed them. The small things get pulled upward in complexity to match the big thing, rather than the architecture acknowledging that the big thing is simply different.</p>
+<p>Microservices thinking compounds this. The implicit message of the pattern is that every unit of functionality deserves a service boundary, independent deployment, and its own operational concerns. Applied uniformly, it imposes the full coordination tax of distributed systems on operations that would have been a function call. The password reset flow does not need a distributed system. The onboarding workflow might, eventually, if specific constraints demand it.</p>
+<p>The uniformity instinct also, paradoxically, under-serves the dominant workflow. When everything is treated as equally important, the complex workflow does not get the focused architectural attention it warrants. The state management, the failure handling, the audit requirements, the retry logic: these deserve careful design. A uniform template applied across the board gives them no more consideration than a settings page.</p>
+<h2>Asymmetry Is a Feature</h2>
+<p>Some of the most elegant structures in computing are asymmetric by design, precisely because their designers were honest about the fact that not all positions are equal. A <a href="https://en.wikipedia.org/wiki/Finger_tree">finger tree</a>, for instance, is a data structure built around the explicit acknowledgement that the ends are special and should be treated differently from the bulk. The result is better performance characteristics than a uniformly-structured alternative would produce. <strong>The asymmetry is not a compromise; it is the point.</strong></p>
+<p>The same principle applies to system architecture. The right response to a lopsided system is not to make it symmetrical by adding complexity to the simple parts. It is to design honestly for what the system actually is: one or two dominant workflows, and a lot of simple operations. The architecture should reflect that.</p>
+<h2>What This Means in Practice</h2>
+<p>The practical implication starts before any technology decision. When approaching a new system, the first question worth asking is not &quot;what database should I use?&quot; or &quot;should this be microservices?&quot;. It is: what is the dominant workflow? What makes it complex? What external dependencies does it call, what state does it manage, what failure modes must it handle?</p>
+<p>Name it. That is the part of the system that warrants careful design. Everything else is likely to fall into place once the domain model is right.</p>
+<p>From there, the architecture follows the shape. The dominant workflow belongs at the core, where it has access to everything it needs: the full state of the system, the orchestration logic, the transition guards, the audit trail. The simple operations live there too, as ordinary function calls. They do not need ceremony.</p>
+<p>Where the dominant workflow calls out to genuinely heavy compute, those concerns can be extracted: an ML model for document verification, a risk scoring engine, an embedding-based similarity service. These earn their separation on concrete grounds (resource weight or independent deployment), not because uniformity demands it. Everything else stays in the core.</p>
+<p>This is the topology described in <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>: a core that can absorb the complexity the dominant workflow demands, with satellites at the boundary for the work that genuinely warrants separation. The pattern works because it is designed for asymmetry. The core is not one service among peers; it is the place where the hard work happens.</p>
+<h3>The Codebase Follows the Shape</h3>
+<p>The dominant workflow is the taproot: thick, central, branching into domain modules, each branching further into the logic they own. The simple operations are shallow roots alongside it. All of them, at every depth, draw from the same source.</p>
+<div class="highlight ascii-art"><pre><span></span>  <span class="c">┌─────────────────────────────────────────┐</span>   <span class="c">┌──────────┐</span>  <span class="c">┌──────────┐</span>
+  <span class="c">│</span>           Order Fulfilment              <span class="c">│</span>   <span class="c">│</span> Change   <span class="c">│</span>  <span class="c">│</span> Update   <span class="c">│</span>
+  <span class="c">└───────┬─────────────┬────────────┬──────┘</span>   <span class="c">│</span> Password <span class="c">│</span>  <span class="c">│</span> Settings <span class="c">│</span>
+          <span class="c">│</span>             <span class="c">│</span>            <span class="c">│</span>          <span class="c">└─────┬────┘</span>  <span class="c">└────┬─────┘</span>
+          ▼             ▼            ▼                <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">┌────────────┐</span>  <span class="c">┌───────────┐</span>  <span class="c">┌────────────┐</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">│</span> Inventory  <span class="c">│</span>  <span class="c">│</span> Payment   <span class="c">│</span>  <span class="c">│</span> Warehouse  <span class="c">│</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">└─────┬──────┘</span>  <span class="c">└────┬──────┘</span>  <span class="c">└────┬───────┘</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">│</span> · Reserve  <span class="c">│</span>  <span class="c">│</span> · Auth    <span class="c">│</span>  <span class="c">│</span> · Pick     <span class="c">│</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">│</span> · Allocate <span class="c">│</span>  <span class="c">│</span> · Capture <span class="c">│</span>  <span class="c">│</span> · Dispatch <span class="c">│</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">│</span> · Restock  <span class="c">│</span>  <span class="c">│</span> · Refund  <span class="c">│</span>  <span class="c">│</span> · Returns  <span class="c">│</span>       <span class="c">│</span>            <span class="c">│</span>
+  <span class="c">└─────┬──────┘</span>  <span class="c">└────┬──────┘</span>  <span class="c">└────┬───────┘</span>       <span class="c">│</span>            <span class="c">│</span>
+        <span class="c">└──────────────┴──────────────┴┬──────────────┴────────────┘</span>
+                                       <span class="c">│</span>
+                         <span class="c">┌─────────────</span>▼<span class="c">───────────┐</span>
+                         <span class="c">│</span>        Data Layer       <span class="c">│</span>
+                         <span class="c">└─────────────────────────┘</span>
+</pre></div>
+<p>The modules do not own storage. They use it. The data layer is not replicated per module; it sits beneath everything, shared and consistent.</p>
+<p>The mistake is to impose uniformity on this structure: to give the password reset its own subtree because the order flow has one, or to give each module its own database because each has its own code. A root system's strength is its asymmetry: deep where depth is needed, shallow where it is not, all drawing from the same water table.</p>
+<h2>Summary</h2>
+<p>Real systems are not uniformly complex. They have a shape, and the shape is almost always the same: one or two dominant workflows that account for most of the complexity, surrounded by operations that are largely simple.</p>
+<p>The architecture diagrams we inherit do not show this. The mental model of consistency compounds it. The result is systems where the simple things are over-engineered, and the complex thing is under-designed.</p>
+<p>Find the dominant workflow. Design for it deliberately. Let everything else be as simple as it actually is.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/three-rewrites-every-startup-does" rel="prev">
+                    <span class="meta-nav">&larr;</span> The Three Rewrites Every Startup Does
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/data-driven-hallucinations" rel="next">
+                    Data-Driven Hallucinations <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

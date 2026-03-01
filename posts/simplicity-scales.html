@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simplicity Scales | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/simplicity-scales">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/events-queues-signals" rel="prev">
+                    <span class="meta-nav">&larr;</span> Events, Queues and Signals
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/idempotency-is-not-optional" rel="next">
+                    Idempotency Is Not Optional <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Simplicity Scales</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-07">
+                March 7, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>&quot;Keep it simple&quot; has always sounded like good advice and felt like a platitude. Easy to say in a conference talk. Hard to defend when the CTO at the last company used Kafka, when the job postings all list Kafka, Kubernetes, Terraform, 3 obscure databases and Apache Spark as a minimum, and when the architecture diagrams in blog posts look like circuit boards.</p>
+<p>But something has changed. The arguments for simpler technology are converging from directions that have nothing to do with each other. Flexibility is one. Hiring markets are another. AI tooling is a third. Scaling economics is a fourth. Four unrelated forces, each independently arriving at the same conclusion.</p>
+<p>When that happens, it stops being a preference and starts being engineering sense.</p>
+<p>The architectural practices that make a system simple also make it portable, hireable, AI-legible, and scalable. Not by accident; because good abstractions are inherently simple, and simplicity compounds.</p>
+<h2>You Can Deploy It More Places</h2>
+<p>In March 2026, Iranian drone strikes hit datacentres in the UAE. Not a hypothetical from a risk assessment: real infrastructure, real outages, real data at risk. If your application was locked to a single cloud provider, you had a problem that no amount of auto-scaling could solve.</p>
+<p>Geopolitics is the dramatic version of a common risk. The quieter versions are just as real:</p>
+<ul>
+<li><strong>Vendor pricing shifts.</strong> AWS reprices continuously. What was cost-effective last year may not be next year, and by the time you notice, you are already locked in.</li>
+<li><strong>Service deprecations.</strong> GCP has a well-documented habit of killing products. If your architecture depends on a managed service that gets sunset, your migration timeline is not yours to choose.</li>
+<li><strong>Data sovereignty regulations.</strong> GDPR was the start, not the end. Jurisdictions are increasingly specific about where data can live and who can access it, and even the nationality of the company that hosts it. A single-cloud deployment may become a compliance liability overnight.</li>
+<li><strong>Vendor lock-in.</strong> Cloud vendors are strongly incentivised to keep you in their orbit, even when it does not benefit you. Proprietary APIs, managed services with no open-source equivalent, pricing models that penalise egress: these are not accidents. They are business strategy.</li>
+</ul>
+<p>Each of these is a reason your application might need to move. The question is whether it can.</p>
+<p>Here is a simple test: if the core of your application cannot run on your laptop, something is wrong with your abstractions. Managed services trade portability for a type of convenience that may be illusory. Most teams never consciously make that trade. They discover it when the bill arrives or the vendor changes the terms.</p>
+<p>A clean <a href="/posts/how-to-build-a-data-access-layer">data layer</a> means storage is swappable. The provider pattern means every external dependency is behind an interface. A <a href="/posts/strategic-monolith-satellites">strategic monolith</a> with <a href="/posts/defer-the-database-not-the-design">standard databases</a> runs on any cloud, any VM, any laptop. Portability is not a feature you build. It is a side effect of not coupling yourself to a vendor's proprietary abstractions.</p>
+<h2>You Can Hire For It</h2>
+<p>Every technology you add to your required stack geometrically shrinks the candidate pool.</p>
+<p>&quot;Python and Postgres&quot; reaches thousands of engineers. Add Kafka: you have cut the pool. Add Kubernetes expertise: cut again. Add Terraform, a specific cloud provider, a service mesh, a particular streaming framework: each requirement halves (or worse) what remains. By the time your job posting reads like a product catalogue, you are fishing in a pond that barely exists.</p>
+<p>Hiring is already the hardest constraint most startups face. Your architecture should not make it harder.</p>
+<p>The engineer who joins and is productive in a week is worth more than the one who needs three months to understand the tooling before they can touch the domain. This is not a statement about talent. It is a statement about leverage. The faster someone can contribute to the thing that matters (the product), the more value they create. Every hour spent learning broker configuration or cloud-specific deployment tooling is an hour not spent on the business problem.</p>
+<p>The compound cost goes beyond the hiring funnel. It is onboarding time. It is the blast radius of mistakes in unfamiliar tooling. It is the bus factor when only two people understand the message broker configuration. It is the salary premium for specialists in technologies you may not have needed in the first place.</p>
+<h3>The Spark That Wasn't Needed</h3>
+<p>At a previous fintech, we had a record linking problem: matching and deduplicating entities across large datasets. The data science team had built the initial solution as pandas scripts running against static exports. It worked, but everyone was worried about scale.</p>
+<p>The decision was made to migrate to Apache Spark. The reasoning felt sound: the datasets were large, Spark was built for large datasets, and the team already knew the Python data ecosystem. The migration took months.</p>
+<p>Then a requirement arrived that, in retrospect, should have been obvious from the start: the system needed to link records on the fly, not as periodic batch runs. Spark can do streaming, but the logic had been built around bounded datasets. The compromise was to run &quot;in batches&quot; against bounded subsets of the live database; an awkward hybrid that was neither truly streaming nor cleanly batch.</p>
+<p>The result was genuinely hard to reason about. Spark's execution model, its cluster management, its failure modes (especially the Python to JVM bridge): these are non-trivial. New engineers took months to become productive. Hiring was constrained to a narrow pool that got much narrower when you added the domain expertise the role also required. Debugging meant reasoning about distributed execution plans rather than application logic.</p>
+<p>The engineering cost, conservatively, ran to low millions over the life of the system.</p>
+<p>The lesson was not that Spark is a bad technology. It is excellent at what it was designed for. The lesson was that when the requirement changed from batch to streaming, the team should have stepped back and reconsidered the architecture and simplified, rather than forcing the new requirement into the existing stack and making things more complex. A simpler approach, built around the actual access pattern, would have been faster to build, easier to hire for, and cheaper to maintain.</p>
+<p>The <a href="/posts/agile-missing-layer-retrospective">organisational retrospective</a> that might have caught this never happened.</p>
+<h3>The Series Answer</h3>
+<p>The practices in this series deliberately minimise the technology surface. A relational database. A well-structured monolith. A clean data layer. Standard language features for <a href="/posts/events-queues-signals">signals</a> and <a href="/posts/system-state-machine">state management</a>. The stack a new hire already knows.</p>
+<h2>AI Can Work With It</h2>
+<p>This is the newest axis, and it points the same way as the others.</p>
+<p>Context is finite, for humans and for AI agents. A simple codebase with clear abstractions, explicit state, and a single place to look for orchestration is one an AI agent can navigate, modify, and test. A sprawl of infrastructure-as-code, broker configurations, and cross-service coordination is one it will hallucinate about.</p>
+<p>OpenAI's engineering team recently (at the time of writing) published their experience building a product with AI agents writing all the code. In <a href="https://openai.com/index/harness-engineering/">Harness Engineering</a>, they report that &quot;technologies often described as 'boring' tend to be easier for agents to model due to composability, API stability, and representation in the training set&quot;. They found that strict architectural boundaries with clear layering were not a nice-to-have but &quot;an early prerequisite&quot; for agent-driven development. Rigid structure enables speed. Ambiguity kills it.</p>
+<p>This maps directly onto the practices in this series. Clean data layers, explicit state machines, injected dependencies, enforced module boundaries: these are not just good engineering for humans. They are what makes a codebase legible to an AI agent. Complexity wastes context. Every layer of indirection, every infrastructure concern baked into application code, every implicit dependency is a token spent explaining the tooling rather than the domain.</p>
+<p>This axis did not exist two years ago. It will matter more every year.</p>
+<h2>Scalability Is in Your Data Layer</h2>
+<p>Scalability is concurrency, and a monolith can be highly concurrent. Worker pools, async frameworks, read replicas, connection pooling: none of this requires spreading your state across services. A single well-structured application with a clean data layer can serve far more traffic than most products will ever see.</p>
+<p>When a specific data touchpoint outgrows its current backend, the <a href="/posts/defer-the-database-not-the-design">data layer absorbs the change</a>. The architecture does not need to. The application code does not change. A new provider implementation, a configuration change at startup, and the system is running on a different backend. The real risk is not under-scaling; it is over-engineering so aggressively that you never ship. The startup that ships fast on boring technology will reach scale problems before the one that spent its first year building infrastructure for traffic it does not yet have. And when those problems arrive, a clean architecture gives you the tools to address them precisely, one touchpoint at a time.</p>
+<h2>Summary</h2>
+<p>Four independent axes. One answer.</p>
+<p>Simpler technology deploys to more places. It opens the hiring pool instead of narrowing it. It gives AI agents something they can actually work with. And it scales through the data layer, not through architectural complexity.</p>
+<p>Not because simplicity is an ideology. Because good abstractions happen to be simple, portable, hireable, AI-legible, and scalable enough.</p>
+<p>That is what the <a href="/posts/on-becoming-a-software-chef">software chef knife techniques</a> enable.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/events-queues-signals" rel="prev">
+                    <span class="meta-nav">&larr;</span> Events, Queues and Signals
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/idempotency-is-not-optional" rel="next">
+                    Idempotency Is Not Optional <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

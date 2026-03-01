@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What&#39;s Expensive in the Age of AI? | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/expensive-in-age-of-ai">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/data-driven-hallucinations" rel="prev">
+                    <span class="meta-nav">&larr;</span> Data-Driven Hallucinations
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>What&#39;s Expensive in the Age of AI?</h1>
+        <p class="post-meta">
+            <time datetime="2026-04-21">
+                April 21, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Most software has been built by gluing things together. Every other App Store update coming in at tens or hundreds of megabytes is not an accident. A new requirement arrives; something existing almost fits with a few gaps, and rewriting it would be far too onerous, so you add a layer, a translation, a wrapper.</p>
+<p>Over time the system becomes a record of every decision that was too expensive to revisit.</p>
+<p>It is a rational response to a real constraint. Coding is error-prone and expensive, worse if there are hundreds of tests depending on a pre-existing structure. The pragmatic move is to preserve what existed and bolt on what is needed. The alternative, stepping back to redesign, is an unaffordable luxury: like a Monday morning bus passenger gazing longingly at an advert for a Lamborghini. And so we resign ourselves to build and work on systems that steadily degrade as time goes on, until a brand new product, framework, or company turns up and &quot;does it properly&quot;.</p>
+<p>And such is the grind. Or was. Until the age of AI.</p>
+<p>AI has not changed the calculus. It has exposed a mistake that was always being made.</p>
+<h2>What Building Actually Cost</h2>
+<p>The received wisdom ran something like: design is cheaper than building, so building is the bottleneck, so optimise around building. Keep the existing code intact. Minimise the rewrite surface. Glue, patch, extend.</p>
+<p>This got the problem backwards. Design was never cheap. It was relatively cheaper than building, which led teams to treat it as the thing to skim. The result: architectural decisions made implicitly, by accumulation, because no one could afford to stop and think them through properly. The cost of building crowded out the thinking that would have made building cheaper.</p>
+<p>If you count honestly, here is what was expensive in the pre-AI era:</p>
+<ul>
+<li><strong>Poor design:</strong> Systems shaped by the path of least resistance rather than the structure of the problem. Every subsequent change costs more because the foundation is wrong.</li>
+<li><strong>Architectural drift:</strong> Each layer added to avoid a rewrite makes the next rewrite larger. The glue compounds.</li>
+<li><strong>Having code at all:</strong> Maintenance, cognitive overhead, onboarding cost, the surface area for bugs. Code is a liability as much as an asset. More code means more of all of these.</li>
+</ul>
+<p>These costs were always present. Diffuse, slow-moving, easy to defer. The cost of writing a new module was immediate and visible. The cost of the wrong abstraction is largely invisible until your delivery manager tells you that you need three months and a lot of crying pillows to change a configuration form, and you realise it is not.</p>
+<h2>What AI Has Actually Made Cheap</h2>
+<p><strong>Code generation</strong> is now fast and cheap. Given a clear specification and a good test suite, an AI can produce a solid implementation in a fraction of the time a developer working alone would have needed. Tests are similarly cheap to generate: not the thinking behind them, what to test, what the edge cases are, what &quot;passing&quot; means. But the mechanical work of writing test cases against a known spec is now a prompt away.</p>
+<p>This breaks the old trade-off. The thing that was expensive is now cheap. The constraint that drove &quot;glue and extend&quot; has gone.</p>
+<p>What teams do with that is the question.</p>
+<h2>The Inversion</h2>
+<p>Code generation being cheap means writing code is no longer a good reason to avoid rethinking the design. The calculus that made gluing rational no longer holds.</p>
+<p>But several things are as expensive as they ever were:</p>
+<p><strong>Design and architecture failings.</strong> AI does not correct a bad design; it implements it faster. A system with poor separation of concerns, tangled state, or the wrong data model will accumulate those problems at the speed of generation. The cost of a wrong abstraction has not changed. The rate at which you can produce wrong abstractions has.</p>
+<p><strong>Having lots of code.</strong> This is the one teams are about to learn the hard way. AI assistance degrades as a codebase grows without discipline. Context windows have limits; more relevantly, so does the ability to reason coherently about a large, poorly-structured system. A growing codebase assembled by accretion may initially feel more tractable when you add AI to the mix. It rapidly becomes less so as context limitations are hit.</p>
+<p><strong>Clarity of intent.</strong> A vague specification produces a vague implementation. You can iterate quickly against a bad spec; you will just build something wrong, and then add ten times more code to work around the design limitations. The quality of the thinking upstream of generation determines the quality of what gets generated.</p>
+<p>Much of the received wisdom around managing complexity exists because building was expensive. With that constraint mostly lifted, some of those strategies are no longer necessary. In fact, they can be actively harmful.</p>
+<h2>The Agentic Flywheel</h2>
+<p>The teams that get this right are not the ones using AI to produce more code faster. They are the ones using AI to maintain a codebase that stays coherent.</p>
+<p><strong>The pattern:</strong> write the spec first, not after. Co-develop it with AI as a thinking partner, stress-testing assumptions before a line of code exists. Build the test suite against the spec, not against the implementation. Treat migrations, including data migrations, as first-class artefacts with their own tests. Then implement cheaply, iterate cheaply, and refactor without fear because the test harness holds the contract.</p>
+<p>None of this is new. It is what <strong>&quot;design left&quot;</strong> has always meant. What is new is that the feedback cycle is now fast enough to make it feel real rather than theoretical. You can redesign a module, regenerate the implementation, and verify it against the test suite in an afternoon. Previously that would have been a sprint.</p>
+<ul>
+<li><strong>Better design makes generation cheaper.</strong></li>
+<li><strong>Cheap generation makes iteration fast.</strong></li>
+<li><strong>Fast iteration makes better design affordable.</strong></li>
+</ul>
+<p>Each turn of the loop compounds.</p>
+<h2>Codebases That Shrink</h2>
+<p>Here is the counterintuitive outcome of taking this seriously: the codebase does not have to grow uncontrollably.</p>
+<p>Every system accumulates code that exists because removing it was expensive. Compatibility shims, wrappers around wrappers, modules that are half-replaced but not quite retired. In a world where rewriting is cheap, you can retire that code. Collapse three layers into one. Replace a tangle of conditionals with a clean model that the current understanding of the domain would have produced from the start.</p>
+<p>Teams that cling to &quot;glue on top of glue&quot; will find that AI accelerates their problems rather than solving them. The context required to reason about an accreted system grows; the clarity required to direct an AI well degrades; the gap between what the system does and what anyone thinks it does widens. AI-enabled development under this mental model does not make a messy codebase manageable. It makes the mess move faster.</p>
+<p>The teams building serious software in the age of AI will not be the ones with the most code. They will be the ones who kept it small, kept it coherent, and used cheap iteration to refine the core rather than extend the perimeter.</p>
+<p>Many of us seasoned veterans have always known this was the right way to build software, but the cost argument for &quot;screw it and glue it&quot; generally won out. Thanks to AI, it is much harder to make that case now.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/data-driven-hallucinations" rel="prev">
+                    <span class="meta-nav">&larr;</span> Data-Driven Hallucinations
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

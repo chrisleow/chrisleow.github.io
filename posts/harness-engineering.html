@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harness Engineering | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/harness-engineering">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/cost-of-wrong-direction" rel="prev">
+                    <span class="meta-nav">&larr;</span> The Cost of Wrong Direction
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Harness Engineering</h1>
+        <p class="post-meta">
+            <time datetime="2026-06-20">
+                June 20, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>The previous article ended with a question. If the discipline in the age of AI shifts to getting the model right early and deferring implementation, what does that actually look like? It is not just &quot;think harder up front&quot;. It is a specific thing you build.</p>
+<p>The harness.</p>
+<p>The harness is the part of the codebase that does not move while generation does its work. Everything else is interchangeable. The harness is not.</p>
+<h2>What the Harness Is</h2>
+<p>The harness is not a testing strategy. It is not a framework. It is a structural discipline: the set of things you hold deliberately stable so that AI generation can proceed safely around them.</p>
+<p>It has three components, in order of load-bearing weight:</p>
+<p><strong>The model.</strong> Your types and immutable domain entities. The vocabulary of the system. If these are wrong, everything generated against them encodes the wrongness.</p>
+<p><strong>The interfaces.</strong> Provider contracts, the context object, the seams between components. Fakeable by design. The harness is only as strong as the interfaces it defines.</p>
+<p><strong>The contract tests.</strong> The guarantee that the interfaces mean something. The fake and the real implementation must both pass the same suite. Without this, the harness is load-bearing but unverified.</p>
+<p>Each of these does a different job. Together they give AI generation somewhere correct to land.</p>
+<h2>The Model: Types First</h2>
+<p>Types are the vocabulary everything else is written in. Get them wrong and the whole system speaks the wrong language. Generation will produce fluent, well-structured, <strong>confidently wrong</strong> code.</p>
+<p>What &quot;types first&quot; means in practice: before you generate implementation, name the things. What are the core entities? What fields do they carry? What are the valid values? These answers need to exist as code, as enums, dataclasses, typed fields, before a line of logic is written.</p>
+<p>A weakly typed system is not just a code quality concern in the age of AI. It is a gap in the harness. Stringly-typed fields, implicit states, bare dictionaries passed between functions: these give generation nowhere solid to stand. The AI infers intent from context and produces something plausible. <strong>Plausible is not the same as correct</strong>, and at generation speed, plausible-but-wrong accretes fast.</p>
+<p>Consider the difference:</p>
+<div class="highlight"><pre><span></span><span class="c1"># Weak: generation guesses, infers, assumes</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_application</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="o">...</span>
+
+<span class="c1"># Strong: generation has a contract to work against</span>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Application</span><span class="p">:</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="n">ApplicationId</span>
+    <span class="n">customer_id</span><span class="p">:</span> <span class="n">CustomerId</span>
+    <span class="n">status</span><span class="p">:</span> <span class="n">ApplicationStatus</span>
+    <span class="n">submitted_at</span><span class="p">:</span> <span class="n">datetime</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">process_application</span><span class="p">(</span><span class="n">application</span><span class="p">:</span> <span class="n">Application</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Application</span><span class="p">:</span>
+    <span class="o">...</span>
+</pre></div>
+<p>The second version tells the generator what an application is, what status means, and what the function promises. The first version leaves all of that implicit. The generator will fill the gap with something, but you have no way to verify it filled it correctly until the logic runs.</p>
+<p>Strong types are how you make the model legible to generation. They are the first layer of the harness. Get them wrong and the second and third layers inherit the error.</p>
+<h2>The Interfaces: Fakeable by Design</h2>
+<p>Every external concern belongs behind an interface the application cannot see through. Storage, queues, third-party APIs, notifications, file stores. If a dependency cannot be faked, the seam is wrong. Fix the coupling, not the test.</p>
+<p>This principle has appeared throughout this series, most fully in <a href="/posts/fake-it-while-you-make-it">Fake It While You Make It</a>. The framing here is different. The question is not &quot;how do I make this testable?&quot; It is &quot;what am I committing to hold stable?&quot;</p>
+<p><strong>The interface is the harness boundary.</strong> What sits behind it is what you are generating freely.</p>
+<p>Inside the harness, you are deliberate. You define the interface; you decide what it promises; you maintain it with intention. Outside the harness, behind the interface, you generate freely. You swap implementations, try alternatives, iterate without ceremony, because nothing in the application depends on what is behind the interface: only on what the interface says.</p>
+<div class="highlight ascii-art"><pre><span></span>                    Harness boundary
+                          |
+  Application code        |      External implementations
+                          |
+  [Domain logic    ] &lt;----|----&gt; [SQLRepository       ]
+  [Service layer   ] &lt;----|----&gt; [S3ObjectStore       ]
+  [Signal handlers ] &lt;----|----&gt; [StripePaymentClient ]
+                          |
+                    AI generates freely
+                    on both sides, but
+                    the boundary itself
+                    is held deliberately.
+</pre></div>
+<p>The practical test: can your entire application boot and run with fakes in place of every external dependency? If not, something has leaked through a boundary that should not have. Find it and fix it. The ability to run the full system in-process, against fakes, with a single constructor call, is the diagnostic that tells you the interfaces are doing their job. But the interface alone is not enough: a boundary without verification is only a promise.</p>
+<h2>Contract Tests: Keeping the Harness Honest</h2>
+<p>A harness that cannot verify itself is <strong>not a harness</strong>. It is a convention, and conventions drift.</p>
+<p>The contract test is the mechanism that keeps the harness honest. It runs the same test suite against both the fake and the real implementation. If they diverge, something is wrong: either the fake is lying, or the interface does not promise what you thought it did. Either way, you want to find out in a test, not in production.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;fake&quot;</span><span class="p">,</span> <span class="s2">&quot;real&quot;</span><span class="p">])</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">application_repository</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">param</span> <span class="o">==</span> <span class="s2">&quot;fake&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FakeApplicationRepository</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">SQLApplicationRepository</span><span class="p">(</span><span class="n">test_database_connection</span><span class="p">())</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_get_returns_inserted_application</span><span class="p">(</span><span class="n">application_repository</span><span class="p">):</span>
+    <span class="n">application</span> <span class="o">=</span> <span class="n">make_application</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">ApplicationStatus</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">)</span>
+    <span class="n">application_repository</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">application_repository</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">application</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span> <span class="o">==</span> <span class="n">application</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_save_updates_status</span><span class="p">(</span><span class="n">application_repository</span><span class="p">):</span>
+    <span class="n">application</span> <span class="o">=</span> <span class="n">make_application</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">ApplicationStatus</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">)</span>
+    <span class="n">application_repository</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+    <span class="n">updated</span> <span class="o">=</span> <span class="n">application</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">ApplicationStatus</span><span class="o">.</span><span class="n">PROCESSING</span><span class="p">)</span>
+    <span class="n">application_repository</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">updated</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">application_repository</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">application</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">ApplicationStatus</span><span class="o">.</span><span class="n">PROCESSING</span>
+</pre></div>
+<p>Both fixture variants run against every test. Any divergence surfaces as a failure. Over time, the contract test becomes the authoritative definition of what a provider is supposed to do: more authoritative than the interface declaration, because it is executable.</p>
+<p>In an AI-assisted codebase, contract tests have an additional role. AI will modify fakes. It will add methods to satisfy a test, adjust behaviour to make something pass, extend an interface because a new feature needed it. Without contract tests, the fake silently drifts from reality. With them, any drift surfaces immediately, before it reaches CI and long before it reaches production.</p>
+<p>The real implementation tests require a real database, so they are slower. Run them in CI. Run the fake-only suite locally during development. The split is deliberate: fast feedback during iteration, full contract verification before merge.</p>
+<h2>The Agentic Flywheel</h2>
+<p>With all three layers in place, the generation loop does not just run faster. It changes character. This is a different loop, not a faster version of the old one.</p>
+<p>The feedback cycle that used to run at CI speed (push, wait, read logs, fix) now runs at test speed, locally, on every iteration. An agent can attempt a change, run the suite, see the result, and try again in seconds. The harness is what makes that safe: the agent is not guessing at infrastructure state or inferring behaviour from production logs. It is working against a deterministic, in-process model of the system.</p>
+<p>The agent generates against the model: it speaks the right vocabulary from the start, because the types give it a contract to work against. It generates behind the interfaces: it never touches real infrastructure, because every external concern is behind a boundary it cannot see through. It runs the full suite in milliseconds against fakes: it knows immediately whether it broke something, because the full application executes in-process with no containers and no network.</p>
+<div class="highlight ascii-art"><pre><span></span>  Strong types + Clean interfaces + Contract tests
+                      |
+                      v
+           AI generates against the harness
+                      |
+                      v
+         Full suite runs in milliseconds
+                      |
+                      v
+     Drift caught by contract tests in CI
+                      |
+                      v
+              Ship with confidence
+</pre></div>
+<p><strong>Fast</strong> because fakes replace infrastructure. <strong>Complete</strong> because the full application runs, not unit-tested fragments in isolation. <strong>Secure</strong> because contract tests mean the fakes are honest, and CI catches what the fast loop misses.</p>
+<h2>Beyond the Backend</h2>
+<p>The same principle extends to the UI. At an early-stage startup, we built a testing platform where the agent drove the browser directly: navigating, interacting with the product, taking screenshots at each step. The agent reviewed its own screenshots, found gaps, made corrections, and iterated before any human was involved. Only once it was satisfied did it assemble the results into a report for UAT sign-off.</p>
+<p>The cycle was fast. Not merely faster than manual testing: fast enough that the agent could attempt a change, screenshot the result, identify a problem, correct it, and screenshot again in seconds. The same loop that makes backend generation safe applies at the UI layer. Attempt, observe, correct, repeat.</p>
+<p>The experience was one of reliability. You could ask for a change, revisit the details across several iterations, and when you deployed, it worked as everyone expected. A complex audit trail feature landed correctly on first deploy. The agent had already seen what the rendered result should look like, verified it in screenshots, corrected what needed correcting, and only then handed it to a human reviewer. By the time it reached UAT, it was not a candidate for review. It was a record of work already done.</p>
+<p>A harness that runs in-process covers the logic. Extended to browser automation, it covers the product. The loop is the same; the boundary just moved.</p>
+<p>That is what deferring implementation actually looks like. Not thinking harder up front: building the thing that holds the model, the boundaries, and the verification in place while generation does its work inside it.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/cost-of-wrong-direction" rel="prev">
+                    <span class="meta-nav">&larr;</span> The Cost of Wrong Direction
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

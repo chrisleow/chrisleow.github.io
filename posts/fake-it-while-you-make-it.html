@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake It While You Make It | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/fake-it-while-you-make-it">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/audit-logs-done-right" rel="prev">
+                    <span class="meta-nav">&larr;</span> Audit Logs Done Right
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/three-rewrites-every-startup-does" rel="next">
+                    The Three Rewrites Every Startup Does <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Fake It While You Make It</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-16">
+                March 16, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Most teams treat testing as something you do after building. You write the code, wire up the infrastructure, and then figure out how to test it. The result is a test suite that requires a running database, a message broker, a cache, and maybe a stable internet connection in order to properly verify behaviour. Tests that take minutes. Tests that fail intermittently because a container was slow to start, or use a staging database that everyone else uses too. Tests that developers stop running locally and leave to CI.</p>
+<p>The discipline described here is different. It is not a testing strategy. It is an architecture strategy: <strong>choose your technology boundaries so that every external concern is behind a fakeable interface</strong>. The testing speed is a consequence. The architecture quality is the point.</p>
+<p>If you cannot fake it, the coupling is the problem. Fix the coupling.</p>
+<h2>What &quot;Faking&quot; Actually Means</h2>
+<p>A fake is a real, working implementation of an interface with an in-memory backend. Here is one:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">FakeObjectStore</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">download</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+</pre></div>
+<p>That is the whole thing. It satisfies the same interface as the real <code>ObjectStore</code>, accepts the same types, and behaves consistently. No network, no credentials, no cloud SDK.</p>
+<p>A mock verifies <em>how</em> your code was called. The test arranges expectations up front: did it call <code>upload()</code> with the right arguments, the right number of times? If the internals change, the mock breaks, even if the behaviour did not.</p>
+<div class="highlight"><pre><span></span><span class="c1"># Mock-based: testing implementation, not behaviour</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_kyc_approval_stores_document</span><span class="p">():</span>
+    <span class="n">mock_store</span> <span class="o">=</span> <span class="n">Mock</span><span class="p">()</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">make_test_context</span><span class="p">(</span><span class="n">object_store</span><span class="o">=</span><span class="n">mock_store</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">make_processing_check</span><span class="p">(</span><span class="n">CUSTOMER_ID</span><span class="p">))</span>
+
+    <span class="n">approve</span><span class="p">(</span><span class="n">CHECK_ID</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+    <span class="n">mock_store</span><span class="o">.</span><span class="n">upload</span><span class="o">.</span><span class="n">assert_called_once_with</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;kyc/</span><span class="si">{</span><span class="n">CHECK_ID</span><span class="si">}</span><span class="s2">/report.pdf&quot;</span><span class="p">,</span> <span class="n">ANY</span><span class="p">)</span>
+    <span class="c1"># Passes. But the mock has no state — you cannot verify the file is</span>
+    <span class="c1"># actually retrievable, only that upload() was called.</span>
+</pre></div>
+<p>A fake is something different: a real, working implementation of the same interface with a different backend. It does not care how it was called; it cares what the outcome was. And because it has state, you can test the full round-trip:</p>
+<div class="highlight"><pre><span></span><span class="c1"># Fake-based: testing behaviour, not implementation</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_kyc_approval_stores_document</span><span class="p">():</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">make_test_context</span><span class="p">(</span>
+        <span class="n">object_store</span><span class="o">=</span><span class="n">FakeObjectStore</span><span class="p">(),</span>
+    <span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">make_processing_check</span><span class="p">(</span><span class="n">CUSTOMER_ID</span><span class="p">))</span>
+
+    <span class="n">approve</span><span class="p">(</span><span class="n">CHECK_ID</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+    <span class="c1"># The file is actually there and retrievable — not just &quot;upload was called&quot;</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">object_store</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;kyc/</span><span class="si">{</span><span class="n">CHECK_ID</span><span class="si">}</span><span class="s2">/report.pdf&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">report</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">report</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+</pre></div>
+<p>The distinction matters in practice. A mock can only record calls; it cannot answer &quot;does the system behave correctly?&quot; A fake can. Mocks are also brittle: they are coupled to the implementation rather than the behaviour. When you refactor the internals of a transition, mock-based tests break even if the behaviour is unchanged. Fake-based tests only break if the behaviour actually changes. A mock is a bet on how the code is written. A fake is a bet on what the code does.</p>
+<p>Fakes have appeared throughout this series without being named as a strategy. The <code>FakeBlogPostProvider</code> in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>. The <code>FakeVerificationService</code> and <code>FakeRiskScoringService</code> in <a href="/posts/system-state-machine">Your System is a State Machine</a>. The <code>make_test_context()</code> helper in <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>. Each article introduced a fake as a side effect of good interface design. This article names the strategy those fakes represent.</p>
+<h2>Design for Fakability</h2>
+<p>The question to ask of every external dependency is: can I put a clean interface in front of this?</p>
+<p>&quot;External&quot; here means anything that is not your domain logic: databases, queues, third-party APIs, ML services, email providers, file stores. Each one is a candidate for fakability. The test is whether your entire application can boot and run with fakes in place of every one of them.</p>
+<p>What this rules out:</p>
+<ul>
+<li>ORMs leaking into application code (the Active Record pattern; a data provider that is also a database object)</li>
+<li>Direct SDK calls scattered through business logic</li>
+<li>Global state or ambient configuration that cannot be overridden per-test</li>
+<li>Side effects that happen at import time rather than at call time</li>
+</ul>
+<p>What it enables: the same code path runs in tests and in production. The domain logic, the state machine, the orchestration, the signal handlers: all of it executes. Only what sits behind the interface changes. In tests, a <code>FakeKYCCheckRepository</code> stores records in memory. In production, a <code>SQLKYCCheckRepository</code> stores them in Postgres. The application code never knows the difference.</p>
+<p>This is not a novel idea. It is hexagonal architecture, ports and adapters, the provider pattern: all different names for the same underlying discipline. The test suite is the diagnostic.</p>
+<h2>Choosing Technologies for Fakability</h2>
+<p>Not every technology choice is equally fakeable, and the time to think about this is before you commit, not after.</p>
+<p><strong>Storage</strong> is the most common concern and the most well-understood. The <a href="/posts/how-to-build-a-data-access-layer">provider pattern</a> wraps every storage touchpoint behind an interface. A <code>FakeKYCCheckRepository</code> backed by an in-memory dict is a few dozen lines and covers the entire test suite. The real SQL implementation is swapped in for CI and production. This is covered in depth elsewhere in this series; the point here is that choosing an ORM that leaks into application code forecloses this option entirely.</p>
+<p><strong>File stores</strong> follow the same pattern. An <code>ObjectStore</code> interface with <code>upload(key, data)</code> and <code>download(key)</code> methods covers most use cases. The fake holds files in a dict. The real implementation writes to S3, GCS, or a local filesystem. The application never knows which.</p>
+<p><strong>Third-party APIs</strong> are wrappers by default. A <code>VerificationService</code> interface hides whether you are calling Onfido, Jumio, or a stub that returns predetermined results. This is also where the fake pays operational dividends: running a full workflow in CI without burning API credits or triggering rate limits.</p>
+<p><strong>Queues</strong> are a natural fit for the same provider pattern as storage. An <code>EventQueue</code> interface with <code>enqueue(item)</code> and <code>dequeue()</code> methods can be backed by a fake that holds items in a list. The application enqueues work and the worker dequeues it; in tests, both sides run in the same process with no polling delay, no broker, and no message serialisation to reason about. Whether the real implementation is a <a href="/posts/your-database-is-already-a-queue">database-backed queue</a> or a dedicated broker is irrelevant to the test.</p>
+<p><strong>Large-scale data processing frameworks</strong> require deliberate thought. Apache Spark can spin up a local in-process cluster for testing, for example, which means it is not untestable; but the startup overhead is real, and if Spark is woven through the core of your application rather than isolated behind a satellite boundary, that overhead lands on every test run. If you genuinely need a framework like this, think carefully about how you will keep the feedback loop fast before committing to it. It is solvable, but it is not free, and it is the kind of thing that is much easier to design for upfront than to retrofit.</p>
+<p><strong>The front end</strong> is worth thinking about separately, because it is the layer most teams abandon to browser automation. Playwright and Selenium are powerful but slow, fragile against DOM changes, and expensive to maintain. The alternative is to choose a rendering approach that keeps HTML generation inside the application process, where a test client can reach it directly as much as possible.</p>
+<p>Low-JavaScript server-rendered approaches make this possible. At the time of writing, <a href="https://htmx.org/">HTMX</a> is the well-known option: HTML attributes that trigger server requests, with the server returning HTML fragments. <a href="https://data-star.dev/">DataStar</a> goes further: a small (~14kb) declarative library that replaces the component model of a traditional SPA with server-sent HTML and reactive signals, with no build tooling required, easy to integrate and <a href="https://data-star.dev/examples/bad_apple">very fast</a>. Both approaches mean most user interactions are a server request and a rendered HTML fragment; in tests, that is a test client call and a string assertion. No browser, no Playwright, no flaky timeout waiting for a React re-render.</p>
+<p>The principle behind all of this is simple: <strong>if in doubt, wrap it</strong>. Every external concern is a candidate for an interface. If a technology cannot be wrapped at all, consider whether a different technology choice would serve the same need and be testable. The test suite you can trust is worth more than the SDK that saved two days of integration work.</p>
+<h2>End-to-End Tests at Unit Test Speed</h2>
+<p>Once every external concern sits behind a fakeable interface, something changes about what &quot;end-to-end&quot; means.</p>
+<p>An end-to-end test in the traditional sense exercises the full stack: a real HTTP request hits a real server, which talks to a real database, which might call a real external API. It is slow, fragile, and expensive to maintain. Most teams run a small number of them and accept the unreliability as a cost of coverage.</p>
+<p>With a fully fake context, an &quot;end-to-end&quot; test is a test client call against a real in-process application instance:</p>
+<p>Consider a KYC onboarding submission: an analyst logs in, uploads a customer's documents, and the system runs identity verification, scores risk, writes an audit trail, and sends a welcome notification if approved. In a conventional integration test this requires a running web server, a database, stub servers for the verification and risk scoring APIs, and an email sink. In practice most teams skip it and test the pieces in isolation, accepting the coverage gap.</p>
+<p>With a fake context, the entire flow is a test client call:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_kyc_submission_triggers_full_onboarding_workflow</span><span class="p">():</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">make_test_context</span><span class="p">(</span>
+        <span class="n">verification</span><span class="o">=</span><span class="n">FakeVerificationService</span><span class="p">({</span>
+            <span class="n">CUSTOMER_ID</span><span class="p">:</span> <span class="n">VerificationResult</span><span class="p">(</span><span class="n">approved</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+        <span class="p">}),</span>
+        <span class="n">risk_scoring</span><span class="o">=</span><span class="n">FakeRiskScoringService</span><span class="p">(</span><span class="n">default_score</span><span class="o">=</span><span class="mi">82</span><span class="p">),</span>
+        <span class="n">notifications</span><span class="o">=</span><span class="n">FakeNotificationService</span><span class="p">(),</span>
+    <span class="p">)</span>
+    <span class="n">app</span> <span class="o">=</span> <span class="n">create_app</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">test_client</span><span class="p">()</span>
+
+    <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/login&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;username&quot;</span><span class="p">:</span> <span class="s2">&quot;analyst@firm.com&quot;</span><span class="p">,</span> <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="s2">&quot;test&quot;</span><span class="p">})</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/kyc/submit&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;customer_id&quot;</span><span class="p">:</span> <span class="n">CUSTOMER_ID</span><span class="p">,</span>
+        <span class="s2">&quot;document_type&quot;</span><span class="p">:</span> <span class="s2">&quot;passport&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;document_ref&quot;</span><span class="p">:</span> <span class="s2">&quot;P4712930&quot;</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="k">assert</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span>
+    <span class="k">assert</span> <span class="sa">b</span><span class="s2">&quot;Application approved&quot;</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">data</span>
+
+    <span class="c1"># Full downstream workflow executed against fakes</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get_for_customer</span><span class="p">(</span><span class="n">CUSTOMER_ID</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">check</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">APPROVED</span>
+    <span class="k">assert</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get_risk_score</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="o">==</span> <span class="mi">82</span>
+
+    <span class="c1"># Audit trail written</span>
+    <span class="n">audit</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">audit_log</span><span class="o">.</span><span class="n">get_for_entity</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">action</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">audit</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">&quot;submitted&quot;</span><span class="p">,</span> <span class="s2">&quot;processing_started&quot;</span><span class="p">,</span> <span class="s2">&quot;approved&quot;</span><span class="p">]</span>
+
+    <span class="c1"># Welcome notification dispatched</span>
+    <span class="k">assert</span> <span class="n">CUSTOMER_ID</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">notifications</span><span class="o">.</span><span class="n">welcome_emails_sent</span>
+</pre></div>
+<p>This test exercises the HTTP layer, the authentication check, the KYC workflow, three calls on dependencies, the audit log writes, and the notification dispatch. Every signal handler fires. Every repository write happens. The HTML response is verified. No containers. No network. No shared staging database. Execution time: milliseconds.</p>
+<p>The fake context is the spec. If the workflow produces the correct outcome against fakes, the domain logic and the abstractions are correct. Whether the real implementations behave consistently with the fakes is a separate question, answered by contract tests.</p>
+<h2>The Contract Test: Keeping Fakes Honest</h2>
+<p>A fake that diverges from the real implementation is worse than no fake. It gives you false confidence: your tests pass, your fakes agree, and then production behaves differently because the real provider has a subtly different behaviour you did not capture.</p>
+<p>The solution is a <strong>parameterised contract test</strong>: run the same test suite against both the fake and the real provider.</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;fake&quot;</span><span class="p">,</span> <span class="s2">&quot;real&quot;</span><span class="p">])</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">kyc_check_repository</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">param</span> <span class="o">==</span> <span class="s2">&quot;fake&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FakeKYCCheckRepository</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">SQLKYCCheckRepository</span><span class="p">(</span><span class="n">test_database_connection</span><span class="p">())</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_get_returns_inserted_check</span><span class="p">(</span><span class="n">kyc_check_repository</span><span class="p">):</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">make_kyc_check</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">)</span>
+    <span class="n">kyc_check_repository</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">check</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">kyc_check_repository</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span> <span class="o">==</span> <span class="n">check</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_save_updates_status</span><span class="p">(</span><span class="n">kyc_check_repository</span><span class="p">):</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">make_kyc_check</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">)</span>
+    <span class="n">kyc_check_repository</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">check</span><span class="p">)</span>
+    <span class="n">updated</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">PROCESSING</span><span class="p">)</span>
+    <span class="n">kyc_check_repository</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">updated</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">kyc_check_repository</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">PROCESSING</span>
+</pre></div>
+<p>Both fixture variants run against every test in the suite. If the fake and the real provider diverge on any test, you have found either a bug in the fake or a misunderstanding of the real thing. Either way, you want to know.</p>
+<p>The contract test has a secondary benefit: it forces precision about what the interface actually promises. Tests that pass against the fake but fail against the real implementation reveal implicit assumptions you had not made explicit. Fixing them tightens the contract and makes the fake more accurate. Over time, the contract test becomes the authoritative definition of what a provider is supposed to do.</p>
+<p>The real provider tests do require a real database, which means they are slower. Run them in CI against a test instance. Run the fake-only suite locally during development. The split is explicit and deliberate: fast feedback during iteration, full contract verification before merge.</p>
+<p>The upshot is that the distinction between &quot;unit test&quot; and &quot;end-to-end test&quot; collapses. Both are function calls. Both run in milliseconds. Both give you a stack trace when they fail, pointing at the line that broke, not at a container log you have to go find. A suite of hundreds of these tests runs in seconds. Developers run it on every save. The feedback loop that used to be &quot;push and wait for CI&quot; becomes immediate.</p>
+<h2>The Path to Continuous Deployment</h2>
+<p>Continuous deployment is one of those goals that most teams agree with in principle and struggle to reach in practice. The bottleneck is almost always confidence: the test suite does not cover enough, or it takes too long, or it is unreliable enough that a red build no longer means something is broken. Any of these conditions forces a human gate before production. The gate accumulates. Deployments become events rather than routine.</p>
+<p>Fakability removes each of these blockers directly. The fake suite runs in seconds. Contract tests run alongside in CI, scoped to verifying provider contracts in isolation. A test against fakes cannot fail due to a slow container, dirty staging data, or an external API returning a 429; the only infrastructure-related reason a fake-based test fails is that the application logic is wrong. When a red build reliably means broken code, you trust it. When you trust it, you can act on it automatically.</p>
+<p>The resulting pipeline is straightforward: fake suite on every push, contract tests in CI, and if both pass the build is a candidate for deployment. No manual testing phase. No release manager coordinating a deployment window. No &quot;we'll do a proper test pass on Friday.&quot; Deployment becomes the automatic consequence of a green build rather than a separate, anxiety-inducing activity.</p>
+<h2>The AI Agent Angle</h2>
+<p>AI agents need a bounded, deterministic context to operate reliably.</p>
+<p>This is not theoretical. OpenAI's engineering team documented it directly in <a href="https://openai.com/index/harness-engineering/">Harness Engineering</a>: strict architectural boundaries with clear layering are &quot;an early prerequisite&quot; for agent-driven development. An agent that calls real infrastructure encounters flaky tests, rate limits, side effects from previous runs, and state that does not reset cleanly between iterations. The unpredictability compounds. The agent hallucinates about infrastructure state. The iteration loop slows to the speed of production.</p>
+<p>The fake context is the harness. An agent working against <code>make_test_context()</code> calls real application code, exercises real domain logic, and sees real domain behaviour. It never touches real infrastructure. Side effects are contained. State resets between runs. Determinism is guaranteed.</p>
+<p>The same discipline that makes developers fast makes agents reliable. A codebase where every external dependency is behind a clean interface, where the full system can be exercised with a constructor call, where fakes are maintained as first-class implementations: that is a codebase an agent can work with. Complexity wastes context. Coupling wastes time. Fakability is what removes both.</p>
+<p>This axis is new. Two years ago, &quot;AI legibility&quot; was not a consideration in architecture decisions. It will matter more every year.</p>
+<h2>Summary</h2>
+<p>Design your boundaries so that every external concern sits behind an interface your application cannot see through. The payoff is layered: end-to-end coverage at unit test speed; contract tests that keep fakes honest and make the interface explicit; a pipeline fast and reliable enough to remove the human gate before production; and a codebase legible enough for an AI agent to iterate against without hitting real infrastructure.</p>
+<p>The fakes in this series have been present from the start. Name the strategy, enforce the discipline, and the test suite becomes something you trust rather than something you tolerate.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/audit-logs-done-right" rel="prev">
+                    <span class="meta-nav">&larr;</span> Audit Logs Done Right
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/three-rewrites-every-startup-does" rel="next">
+                    The Three Rewrites Every Startup Does <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

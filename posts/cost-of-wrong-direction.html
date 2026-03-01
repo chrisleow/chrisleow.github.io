@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Cost of Wrong Direction | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/cost-of-wrong-direction">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/expensive-in-age-of-ai" rel="prev">
+                    <span class="meta-nav">&larr;</span> What&#39;s Expensive in the Age of AI?
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/harness-engineering" rel="next">
+                    Harness Engineering <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>The Cost of Wrong Direction</h1>
+        <p class="post-meta">
+            <time datetime="2026-06-13">
+                June 13, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>The received wisdom on incremental development runs something like:</p>
+<ul>
+<li>Build a little, learn a little, keep the cost of change low.</li>
+<li>Commit to nothing you cannot afford to revisit.</li>
+<li>Let the design emerge from the work rather than trying to specify it upfront.</li>
+</ul>
+<p>The assumption underneath this was always that code is expensive to write. You deferred because you could not afford to be wrong. AI has made code cheap.</p>
+<p>So does the received wisdom still hold?</p>
+<p>Partly. The assumption was half right, and understanding which half is what matters now.</p>
+<h2>What Incrementalism Was Actually For</h2>
+<p>Incremental development was never just about the cost of writing code. It was about the cost of being wrong. Build small so that when you discover you have misunderstood the domain, the requirement, or the user, you have not committed too deeply. Keep the blast radius of any single mistake small. The cheapness of code was the mechanism. Keeping the cost of mistakes low was the goal.</p>
+<p>These are not the same thing, and conflating them is what leads many teams astray in the age of AI.</p>
+<h2>What AI Made Cheap</h2>
+<p>Code generation is now fast and cheap. Given a <strong>clear model</strong> and a <strong>good test harness</strong>, an AI can produce a solid implementation in a fraction of the time a developer working alone would have needed. Refactoring an implementation against a new spec is similarly cheap. Rewriting a module, even a large one, is no longer the multi-day undertaking it once was.</p>
+<p>What AI has not made cheap:</p>
+<p><strong>Getting the domain model right.</strong> Understanding what the core models and structures are, what states they move through, what transitions are valid: this requires understanding the problem. That is a human constraint, not a coding constraint. It has not changed.</p>
+<p><strong>Identifying where the seams go.</strong> The interfaces between components, the boundaries between concerns, the question of what belongs together and what does not: these decisions are as hard as they ever were. AI will implement whatever seams you give it. It will not tell you they are wrong.</p>
+<p><strong>Deciding what the system should do.</strong> The thinking upstream of generation determines the quality of what gets generated. A vague model produces a coherent-looking implementation of the wrong thing.</p>
+<h2>The Amplification</h2>
+<p>Here is what has changed. When code was expensive, misalignment surfaced slowly. A bad model produced slow, painful code. You felt the wrongness before it compounded far. The friction was a signal.</p>
+<p>With AI generation, that signal is gone. You can build five coherent-looking layers on a bad model in a day. Each layer assumes the validity of the one beneath it. The dependency graph grows fast, and it grows quietly.</p>
+<div class="highlight ascii-art"><pre><span></span>Day 1        Day 3              Day 7
+             
+[Model]      [Model]            [Model]
+             [Layer A]          [Layer A]
+             [Layer B]          [Layer B]
+                                [Layer C]
+                                [Layer D]
+                                [Layer E]
+             
+             Looks fine.        Still looks fine.
+</pre></div>
+<p>By the time the misalignment surfaces, you are not unwinding one bad decision. You are unwinding the decision plus everything that grew on top of it: the integrations, the tests, the callers, the assumptions baked into each subsequent layer.</p>
+<p>Worse: the output is self-concealing. AI-generated code tends to be internally consistent even when it is consistently wrong. You do not get the usual signal of accumulating mess. It looks clean. It looks well-structured. The wrongness is in the direction, not the surface, and direction is harder to see.</p>
+<h2>The Exponential</h2>
+<p>The cost of correction is not linear in the depth of wrong-direction code. Each layer added in the wrong direction brings its own integrations, its own tests, its own callers. Unwinding it means unwinding all of that too. The correction cost compounds.</p>
+<p>With hand-written code, the practical cap on how far wrong you could go was <strong>time</strong>. You could only build so fast before the friction of misalignment slowed you down and surfaced the problem. That was an accidental safety mechanism.</p>
+<p>With AI generation, that cap is gone. The rate of wrong-direction accretion is now limited by <strong>how long it takes you to notice</strong>, not how long it takes to write. And because the output looks coherent, you notice later. <strong>Much later.</strong></p>
+<h2>The Methodology Becomes the Trap</h2>
+<p>This is where a slavish devotion to incremental development stops being the solution and starts being the problem.</p>
+<p>Incrementalism works by committing you to small steps. That is its virtue: each decision is cheap, each mistake is contained. But when the direction is wrong, that same commitment works against you.</p>
+<p>The fix for misaligned direction is not a small step. It is a correction to the model: the types, the state machine, the seams. By definition it touches everything built on top of it. In an incremental methodology, that correction never fits the next sprint. It is <strong>always</strong> too large, <strong>always</strong> deferred, always &quot;after we ship this&quot;. And because each sprint adds more code on top of the wrong model, the correction needed grows. The gap between what can be done incrementally and what it would actually take to fix the direction widens permanently.</p>
+<p>The real fix does not just feel out of reach. It is out of reach, by the logic of the methodology you have adopted. The system keeps moving. Each step is locally rational. The direction problem is never addressed because addressing it was never going to be a small step.</p>
+<p>This is the trap: the discipline that was supposed to keep decisions cheap can make one wrong decision <strong>permanently unaffordable.</strong></p>
+<h2>The Discipline Shift</h2>
+<p>Incrementalism does not die. The unit changes.</p>
+<p>Before AI, the advice was: defer everything. Code is expensive to write, so write as little as possible until you have to. Let the design emerge.</p>
+<p>After AI, the advice is: defer <em>implementation</em>, but invest early in the model and the interfaces. Get the types right. Get the state machine right. Get the seams right. These are the things that do not get cheaper when code gets cheaper. They are the skeleton that all the generated code will integrate against. If the skeleton is wrong, everything attached to it is wrong, and generation will compound that problem fast.</p>
+<p>What you are still deferring is the implementation detail: exactly how a module works internally, which third-party library sits behind an interface, how a migration runs. These are cheap to change. Defer them freely.</p>
+<p>What you are no longer deferring is the model. Because the cost of getting it wrong has gone <strong>up</strong>, not down.</p>
+<h2>The Signals</h2>
+<p>The misalignment shows up early if you are looking for it.</p>
+<p><strong>The interfaces feel wrong.</strong> You keep passing things that feel incidental to a function. Parameters that are there because something needed them somewhere. Seams that cut across concerns rather than between them.</p>
+<p><strong>The state machine resists description.</strong> You cannot explain the lifecycle of your core entity cleanly. States are implicit; state transitions are scattered across the codebase rather than named and centralised. You struggle to say what the valid next state is from any given point.</p>
+<p><strong>Tests feel like they are testing the wrong thing.</strong> Coverage looks reasonable but confidence feels low. The tests describe what the code does, not what the system should do. Passing feels like an accident.</p>
+<p>These are not signals to note and move on from. They are signals to stop and act on. The longer you wait, the more the correction is not just fixing a model: it is fixing a model <strong>plus its blast radius.</strong></p>
+<h2>Where This Leads</h2>
+<p>Incrementalism gave teams a discipline for managing uncertainty. It still does. But in the age of AI, uncertainty about the domain is not managed by deferring everything. It is managed by being precise about what you are certain of and deferring only what you are not.</p>
+<p>The core model: as <strong>certain as you can make it, as early as possible</strong>. The implementation: defer, iterate, regenerate cheaply.</p>
+<p>That distinction, between what is load-bearing and what is interchangeable, is what the next article is about. Building the harness that holds the model stable while generation does its work.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/expensive-in-age-of-ai" rel="prev">
+                    <span class="meta-nav">&larr;</span> What&#39;s Expensive in the Age of AI?
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/harness-engineering" rel="next">
+                    Harness Engineering <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

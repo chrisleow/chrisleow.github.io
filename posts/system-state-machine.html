@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your System is a State Machine | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/system-state-machine">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/database-as-a-queue" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your Database is Already a Queue
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Your System is a State Machine</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-01">
+                March 1, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>The most common first question in a new system design is &quot;what database should I use&quot;? The second is usually &quot;should this be a microservice&quot;? Both are premature. Before you pick the infrastructure, model the domain.</p>
+<p>Your system is a state machine whether you name it or not. Naming it gives you leverage: over complexity, over testing, over the conversations you have with your team about what the system actually does. This article is about that mental model. Not a framework, not a library, but a way of thinking about systems that makes the downstream choices obvious.</p>
+<p>The architecture that follows from this model is described in <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>. This article is the foundation it rests on.</p>
+<hr />
+<h2>The Mental Model</h2>
+<p>Work items exist in a defined set of states, and they move between those states via transitions. Each transition is:</p>
+<ul>
+<li><strong>Atomic</strong>: it either fully happens or it does not.</li>
+<li><strong>Idempotent</strong>: triggering the same transition twice produces the same result as triggering it once.</li>
+</ul>
+<p>This is not a novel idea. It is what most well-designed systems already do, often without naming it.</p>
+<p>A few examples:</p>
+<ul>
+<li>An order: <code>PENDING</code> → <code>CONFIRMED</code> → <code>SHIPPED</code> → <code>DELIVERED</code> (or <code>CANCELLED</code>)</li>
+<li>A KYC check: <code>SUBMITTED</code> → <code>PROCESSING</code> → <code>APPROVED</code> / <code>REJECTED</code> / <code>REFERRED</code></li>
+<li>A payment: <code>INITIATED</code> → <code>AUTHORISED</code> → <code>SETTLED</code> / <code>FAILED</code> / <code>REVERSED</code></li>
+<li>A loan application: <code>DRAFT</code> → <code>SUBMITTED</code> → <code>UNDER_REVIEW</code> → <code>APPROVED</code> / <code>DECLINED</code></li>
+</ul>
+<p>The states and transitions are the domain model. Get them right and everything else follows. Get them wrong and no amount of clever infrastructure compensates.</p>
+<hr />
+<h2>What Happens Without It</h2>
+<p>Every system has states and transitions. The question is whether they are explicit or accidental. When they are accidental, the same failure modes appear over and over.</p>
+<p><strong>Boolean field proliferation.</strong> Instead of an enum, the table has <code>is_processed</code>, <code>is_approved</code>, <code>is_sent</code>, <code>is_failed</code>. Half the combinations are impossible but nothing prevents them. What does <code>is_processed = true, is_approved = false, is_failed = false</code> mean? Nobody is sure. Every query that touches these fields needs to encode its own interpretation of which combinations are valid. This is sometimes called &quot;boolean blindness&quot;: the type system cannot help you because it does not know what the booleans represent in combination.</p>
+<p><strong>Status columns that drift.</strong> A VARCHAR <code>status</code> column, updated from anywhere in the codebase. New values appear informally. Nobody knows all possible states without grepping. No guard prevents an item moving from <code>DELIVERED</code> back to <code>PENDING</code>. The column is technically a state machine; it is just one with no rules.</p>
+<p><strong>Partial state from non-atomic updates.</strong> A &quot;state change&quot; touches three tables in sequence. The process fails halfway through. The item is now half-approved: one table says yes, another says no. No single transaction boundary protected the change. Fixing these items is a manual, data-specific recovery job.</p>
+<p><strong>Invisible transitions.</strong> State changes are side effects buried in application code. Understanding the lifecycle of a work item means reading the entire codebase. No single function you can point to and say &quot;this is how an item moves from X to Y&quot;. Onboarding a new developer means walking them through the implicit workflow verbally, because it is not written down anywhere the code can enforce.</p>
+<p><strong>Mystery states in production.</strong> Items end up somewhere nobody recognises. &quot;How did this get to PROCESSING with no verification result?&quot; Nobody knows, because there was no guard to prevent it. The incident response is a forensic exercise across logs, database snapshots, and guesswork.</p>
+<p><strong>The accidental distributed system.</strong> Multiple services each own a slice of the workflow state. Nobody designed the coordination; it emerged. You now have eventual consistency problems without ever having chosen eventual consistency. Debugging requires correlating state across services, and the answer to &quot;what state is this item in?&quot; depends on which service you ask.</p>
+<p>At a previous fintech company, I saw this pattern in a data processing pipeline built on multiple Kafka topics and aggregation stages. Each service would receive a document, process it, and forward the output. A final aggregator combined the results from all upstream stages to publish the system's output data points.</p>
+<p>The problem: everything had to work flawlessly for any of it to work at all.</p>
+<p>When an upstream service failed or produced bad data, the final aggregator had an incomplete or inaccurate view. Fixing it meant updating aggregator state ad-hoc, and in the worst case, replaying entire input topics and publishing potentially out-of-date data for days before eventual consistency kicked in and state normalised.</p>
+<p>Hard to reason about, hard to identify affected cases, hard to test, and no definitive source of truth anywhere.</p>
+<p>If any of this sounds familiar, naming the state machine is the fix.</p>
+<hr />
+<h2>Modelling States and Transitions</h2>
+<h3>States as Enums</h3>
+<p>The first discipline is representing states as enums, not strings or booleans. An enum makes invalid states unrepresentable. The compiler (or runtime, depending on your language) becomes your first line of defence.</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">KYCStatus</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">SUBMITTED</span>  <span class="o">=</span> <span class="s2">&quot;submitted&quot;</span>
+    <span class="n">PROCESSING</span> <span class="o">=</span> <span class="s2">&quot;processing&quot;</span>
+    <span class="n">APPROVED</span>   <span class="o">=</span> <span class="s2">&quot;approved&quot;</span>
+    <span class="n">REJECTED</span>   <span class="o">=</span> <span class="s2">&quot;rejected&quot;</span>
+    <span class="n">REFERRED</span>   <span class="o">=</span> <span class="s2">&quot;referred&quot;</span>
+</pre></div>
+<p>Five states. Each one is named, each one is distinct, and no combination of boolean fields can produce a state that does not exist in this list. If a new state is needed, it is added to the enum; the type system then surfaces every place in the codebase that needs to handle it.</p>
+<h3>Immutable Domain Models</h3>
+<p>The domain model is an immutable record. No ORM, no <code>save()</code> methods; just the shape of the data at a given point in time.</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">KYCCheck</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="nb">id</span><span class="p">:</span>           <span class="n">UUID</span>
+    <span class="n">customer_id</span><span class="p">:</span>  <span class="n">UUID</span>
+    <span class="n">status</span><span class="p">:</span>       <span class="n">KYCStatus</span>
+    <span class="n">submitted_at</span><span class="p">:</span> <span class="n">datetime</span>
+    <span class="n">decided_at</span><span class="p">:</span>   <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span>
+</pre></div>
+<p>A <code>KYCCheck</code> does not know how to persist itself. It does not contain a database connection. It is data, and nothing more. Transitions produce new records rather than mutating existing ones.</p>
+<h3>Explicit Transition Functions</h3>
+<p>Transitions are functions, not methods on the model. Each one asserts the required prior state, writes atomically through the data layer, and fires a signal to notify the rest of the system.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">begin_processing</span><span class="p">(</span><span class="n">check_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">KYCCheck</span><span class="p">:</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">check_id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">check</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">SUBMITTED</span>
+
+    <span class="c1"># ... validate submission is complete, prepare for processing ...</span>
+
+    <span class="c1"># transition</span>
+    <span class="n">updated</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">PROCESSING</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">updated</span><span class="p">)</span>
+
+    <span class="n">notify</span><span class="p">(</span><span class="n">Signal</span><span class="o">.</span><span class="n">PROCESSING_STARTED</span><span class="p">,</span> <span class="n">updated</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">updated</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">approve</span><span class="p">(</span><span class="n">check_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">KYCCheck</span><span class="p">:</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">check_id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">check</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">PROCESSING</span>
+
+    <span class="c1"># ... finalise approval, compute metadata ...</span>
+
+    <span class="c1"># transition</span>
+    <span class="n">updated</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
+        <span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">APPROVED</span><span class="p">,</span>
+        <span class="n">decided_at</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">updated</span><span class="p">)</span>
+
+    <span class="n">notify</span><span class="p">(</span><span class="n">Signal</span><span class="o">.</span><span class="n">APPROVED</span><span class="p">,</span> <span class="n">updated</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">updated</span>
+</pre></div>
+<p>The guard (<code>assert check.status == ...</code>) is the key. It makes illegal transitions impossible at runtime. If an item is already <code>APPROVED</code>, calling <code>begin_processing</code> on it fails immediately and explicitly rather than silently corrupting the data.</p>
+<p>The <code>context</code> parameter is the application's <code>Context</code> object: a single container holding all repositories and services, injected at startup. Every transition function receives the full execution context. The full treatment of this pattern is in <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>.</p>
+<h3>Guard Conditions</h3>
+<p>Not every transition from a given state should be unconditional. A guard condition is a rule that determines whether a transition is allowed beyond just the prior state.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">refer</span><span class="p">(</span><span class="n">check_id</span><span class="p">:</span> <span class="n">UUID</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">KYCCheck</span><span class="p">:</span>
+    <span class="n">check</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">check_id</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">check</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">PROCESSING</span>
+    <span class="k">assert</span> <span class="n">reason</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="s2">&quot;Referral requires a reason&quot;</span>
+
+    <span class="c1"># transition</span>
+    <span class="n">updated</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="n">KYCStatus</span><span class="o">.</span><span class="n">REFERRED</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">updated</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">record_referral_reason</span><span class="p">(</span><span class="n">check_id</span><span class="p">,</span> <span class="n">reason</span><span class="p">)</span>
+
+    <span class="n">notify</span><span class="p">(</span><span class="n">Signal</span><span class="o">.</span><span class="n">REFERRED</span><span class="p">,</span> <span class="n">updated</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">updated</span>
+</pre></div>
+<p>The guard is explicit and testable. If a referral requires a reason, the function enforces it. No external validation layer, no framework annotation; just an assertion in the transition function where the rule belongs.</p>
+<hr />
+<h2>Worked Example: KYC Onboarding</h2>
+<p>The building blocks above (enums, immutable models, transition functions, guards) are general. KYC (Know Your Customer) onboarding is a good place to show how they compose into a complete workflow, because the domain is genuinely complex, the state machine maps naturally, and the interactions with external systems are varied.</p>
+<h3>The States</h3>
+<div class="mermaid-diagram"><img src="0009-system-state-machine/mermaid-1c4caa0cbe880e75.svg" alt="Mermaid diagram"></div>
+<h3>Signals and Orchestration</h3>
+<p>When a transition happens, interested code within the core needs to react. A <strong>signal</strong> is an in-process notification that a transition occurred; lightweight, synchronous by default, zero infrastructure. It is not a message bus. It is a function call with a subscriber list.</p>
+<div class="highlight"><pre><span></span><span class="nd">@signal_handler</span><span class="p">(</span><span class="n">Signal</span><span class="o">.</span><span class="n">PROCESSING_STARTED</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_verification</span><span class="p">(</span><span class="n">check</span><span class="p">:</span> <span class="n">KYCCheck</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">verification</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">customer_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">approved</span><span class="p">:</span>
+        <span class="n">approve</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">result</span><span class="o">.</span><span class="n">needs_review</span><span class="p">:</span>
+        <span class="n">refer</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">reject</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+<span class="nd">@signal_handler</span><span class="p">(</span><span class="n">Signal</span><span class="o">.</span><span class="n">APPROVED</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_risk_scoring</span><span class="p">(</span><span class="n">check</span><span class="p">:</span> <span class="n">KYCCheck</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">risk_scoring</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">customer_id</span><span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">record_risk_score</span><span class="p">(</span><span class="n">check</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">score</span><span class="p">)</span>
+</pre></div>
+<p><code>context.verification</code> and <code>context.risk_scoring</code> are satellites: stateless services that do heavy compute (ML inference, rules engines) and return a result. They are accessed through the <code>Context</code> like everything else. Whether they are HTTP calls, gRPC, or in-process for testing is hidden behind the interface.</p>
+<p>The distinction between signals, domain events, and queue items is important and frequently conflated. The full treatment is in a companion article, <em>Events vs Signals</em>.</p>
+<h3>Sub-State-Machines</h3>
+<p>Approval triggers a webhook to a partner system. That webhook has its own lifecycle:</p>
+<p><code>PENDING</code> → <code>SENDING</code> → <code>DELIVERED</code> / <code>FAILED</code> / <code>RETRYING</code></p>
+<p>This is a child state machine, not part of the parent. It gets its own model, its own enum, and its own transitions:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">WebhookStatus</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">PENDING</span>   <span class="o">=</span> <span class="s2">&quot;pending&quot;</span>
+    <span class="n">SENDING</span>   <span class="o">=</span> <span class="s2">&quot;sending&quot;</span>
+    <span class="n">DELIVERED</span> <span class="o">=</span> <span class="s2">&quot;delivered&quot;</span>
+    <span class="n">FAILED</span>    <span class="o">=</span> <span class="s2">&quot;failed&quot;</span>
+    <span class="n">RETRYING</span>  <span class="o">=</span> <span class="s2">&quot;retrying&quot;</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">WebhookDelivery</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="nb">id</span><span class="p">:</span>        <span class="n">UUID</span>
+    <span class="n">check_id</span><span class="p">:</span>  <span class="n">UUID</span>   <span class="c1"># linked to parent by foreign key</span>
+    <span class="n">status</span><span class="p">:</span>    <span class="n">WebhookStatus</span>
+    <span class="n">endpoint</span><span class="p">:</span>  <span class="nb">str</span>
+    <span class="n">attempts</span><span class="p">:</span>  <span class="nb">int</span>
+</pre></div>
+<p>The key rule: the child's state does not leak into the parent's enum. A KYC check is <code>APPROVED</code> regardless of whether the webhook succeeded or is still retrying. The parent triggered the child; it does not wait for it or change state based on it.</p>
+<p>The same pattern applies to any stateful side effect: sending notifications, generating PDFs, syncing records to external systems. Each one gets its own table, its own enum, its own transition functions. Without this separation, the parent enum grows to encode every combination of business state and delivery state. Five business states multiplied by four delivery states is twenty combinations, most of which are meaningless.</p>
+<h3>Testing</h3>
+<p>Because every dependency enters through the <code>Context</code>, testing a transition is a constructor call and an assertion:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_approved_check_gets_risk_score</span><span class="p">():</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">make_test_context</span><span class="p">(</span>
+        <span class="n">verification</span><span class="o">=</span><span class="n">FakeVerificationService</span><span class="p">(</span>
+            <span class="n">results</span><span class="o">=</span><span class="p">{</span><span class="n">CUSTOMER_ID</span><span class="p">:</span> <span class="n">VerificationResult</span><span class="p">(</span><span class="n">approved</span><span class="o">=</span><span class="kc">True</span><span class="p">)}</span>
+        <span class="p">),</span>
+        <span class="n">risk_scoring</span><span class="o">=</span><span class="n">FakeRiskScoringService</span><span class="p">(</span><span class="n">default_score</span><span class="o">=</span><span class="mi">75</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">make_submitted_check</span><span class="p">(</span><span class="n">CUSTOMER_ID</span><span class="p">))</span>
+
+    <span class="n">begin_processing</span><span class="p">(</span><span class="n">CHECK_ID</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+    <span class="n">check</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">CHECK_ID</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">check</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">KYCStatus</span><span class="o">.</span><span class="n">APPROVED</span>
+
+    <span class="n">score</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">kyc_checks</span><span class="o">.</span><span class="n">get_risk_score</span><span class="p">(</span><span class="n">CHECK_ID</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">score</span> <span class="o">==</span> <span class="mi">75</span>
+</pre></div>
+<p>No mock framework. No patching. No cleanup. The fakes are real implementations that accept the same types and return the same types. The test reads as a description of the workflow: submit, process, assert the outcome.</p>
+<hr />
+<h2>When the Model Breaks Down</h2>
+<p>Not everything is a clean state machine. Some workflows are more graph than linear sequence. Long-running processes with external dependencies and unpredictable timeouts do not always fit neatly into a set of named states with deterministic transitions.</p>
+<p>The pragmatic response is: model what you can, document what you cannot. A system where 80% of the workflows are explicit state machines and 20% are pragmatic deviations is vastly better than one where 100% of the state management is implicit. The named state machines give you a baseline of clarity; the deviations are visible precisely because the baseline exists.</p>
+<p>Perfection is not the goal. Deliberateness is.</p>
+<hr />
+<h2>Summary</h2>
+<p>Pick the mental model before the stack.</p>
+<p>A system is a state machine. States are enums. Transitions are explicit, atomic functions that assert the required prior state and write through the data layer. Side effects with their own lifecycle are child state machines, not extensions of the parent. Signals handle in-process orchestration. The <code>Context</code> object makes every dependency explicit and every component testable.</p>
+<p>What this gives you:</p>
+<ul>
+<li><strong>A readable domain.</strong> Every possible state and transition is named and visible in the code.</li>
+<li><strong>Atomic writes.</strong> No partial state, no distributed transactions.</li>
+<li><strong>Idempotency by construction.</strong> The same transition on the same state produces the same result.</li>
+<li><strong>Clear error handling.</strong> Invalid transitions fail explicitly at the guard, not silently in the data.</li>
+<li><strong>Auditability.</strong> The model naturally supports capturing a record of every transition; the implementation options are explored in <em>Audit Trails Done Properly</em>.</li>
+</ul>
+<p>The rest of the series builds on this foundation:</p>
+<ul>
+<li><a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>: the architecture that follows from this model</li>
+<li><a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>: the abstraction behind the repositories</li>
+<li><a href="/posts/your-database-is-already-a-queue">Your Database is Already a Queue</a>: async processing within this architecture</li>
+<li><em>Events vs Signals</em>: the distinction between in-process signals, domain events, and queue items</li>
+<li><em>Idempotency is Not Optional</em>: the discipline that makes transitions safe</li>
+<li><em>Audit Trails Done Properly</em>: how to capture and query the record of what happened</li>
+</ul>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/database-as-a-queue" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your Database is Already a Queue
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

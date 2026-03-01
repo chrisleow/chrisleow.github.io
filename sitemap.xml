@@ -16,6 +16,13 @@
 
 
   <url>
+    <loc>https://chrisfrequency.com/posts/system-state-machine</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
     <loc>https://chrisfrequency.com/posts/strategic-monolith-satellites</loc>
     <lastmod>2026-02-28</lastmod>
     <changefreq>monthly</changefreq>

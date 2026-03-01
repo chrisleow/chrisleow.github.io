@@ -11,6 +11,14 @@
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
     
     <item>
+        <title>Your System is a State Machine</title>
+        <link>https://chrisfrequency.com/posts/system-state-machine</link>
+        <pubDate>Sun, 01 Mar 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/system-state-machine</guid>
+        <description><![CDATA[The most common first question in a new system design is "what database should I use"? The second is usually "should this be a microservice"? Both are premature. Before you pick the infrastructure, model the domain. Your system is a state machine whether you...]]></description>
+    </item>
+    
+    <item>
         <title>Strategic Monolith + Satellites</title>
         <link>https://chrisfrequency.com/posts/strategic-monolith-satellites</link>
         <pubDate>Sat, 28 Feb 2026 00:00:00 GMT</pubDate>

@@ -104,7 +104,7 @@
 <p><strong>Start with a relational database.</strong> Almost every early-stage product should. A single PostgreSQL instance handles transactional, analytical, search, and even graph workloads adequately until you have genuinely outgrown it. The instinct to reach for a document store, a graph database, or a time-series store before you understand your access patterns is one of the most expensive mistakes a team can make. Think hard before introducing a second storage technology. The reasoning behind this is expanded in <a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>.</p>
 <p>For side projects, MVPs, and embedded tooling, <a href="/posts/sqlite-secret-weapon">SQLite</a> carries zero operational overhead and is considerably more capable than most engineers expect.</p>
 <p><strong>A clean data layer</strong> is the abstraction that holds the architecture together. It insulates the application from storage decisions, makes each component independently testable, and keeps the exit route open when a touchpoint eventually outgrows its current backend. The full pattern is described in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>.</p>
-<p><strong>A database-backed queue</strong> is the right tool when work needs async processing or needs to call a satellite at a controlled rate; not a message broker, but a table with a few index tricks. This is covered in depth in <a href="/posts/your-database-is-already-a-queue">Your Database is Already a Queue</a>.</p>
+<p><strong>A managed queuing system</strong> handles async processing and controlled-rate satellite calls. I often advocate for a <a href="/posts/your-database-is-already-a-queue">database-backed approach</a>, but the key point is that the queue is an implementation detail behind the data layer, not an architectural commitment.</p>
 <p>Each ingredient is swappable because the data layer insulates the application from the storage choice beneath it. You add them when the constraints demand it, not when a blog post tells you to.</p>
 <hr />
 <h2>In Practice: KYC Onboarding</h2>
@@ -184,16 +184,7 @@
 <p>Logically distribute compute, not state.</p>
 <p>A monolithic core with satellites and data components gives you the scaling benefits of distributed systems without the coordination overhead. The core owns all domain state and orchestration. Satellites handle heavy, independently deployable functions. Data components handle specialised storage behind the data layer. The bar for extraction is concrete: resource weight or independent deployment.</p>
 <p>Start with a relational database, add ingredients when the constraints demand it, and keep the exit routes open.</p>
-<p>The rest of the series builds on this foundation:</p>
-<ul>
-<li><a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>: the abstraction that makes the architecture work</li>
-<li><a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>: how to evolve the ingredients without rewriting the application</li>
-<li><a href="/posts/your-database-is-already-a-queue">Your Database is Already a Queue</a>: what async processing looks like within this architecture</li>
-<li><em>Your System is a State Machine</em>: the mental model that makes this topology obvious</li>
-<li><em>Events vs Signals</em>: what goes wrong when you reach for a broker before you have earned it</li>
-<li><em>Idempotency is Not Optional</em>: the discipline that makes state transitions safe</li>
-<li><em>Audit Trails Done Properly</em>: how to capture and query the record of what happened</li>
-</ul>
+<p>This is part of a series on pragmatic architecture for startups and scaleups.</p>
 
     </div>
 

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On Becoming a Software Chef | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/on-becoming-a-software-chef">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/system-state-machine" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your System is a State Machine
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>On Becoming a Software Chef</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-02">
+                March 2, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>At the end of a long day immersed in the world of software and systems, (occasionally in the middle if working from home), I sometimes relax by cooking myself a meal.</p>
+<p>I am but a lowly home cook, but I feel that I've learned something over the years.  When visiting certain friends, I am sometimes amazed by the number of kitchen gadgets in their possession, one for every conceivable task, bread makers, egg slicers, omelette makers etc..., but when handed a kitchen knife, I can only look on while holding my breath as they grip it like a baseball bat, brow furrowed in concentration and push it down slowly on some poor, unfortunate vegetable.</p>
+<p>It got me thinking ...</p>
+<p>Look at a professional chef's kit. It fits in a roll bag. A good knife, a few pans, a chopping board, a handful of essentials. The chef isn't under-equipped. They've learned, through years of daily practice, that technique with a good knife covers 95% of what they'll ever need.</p>
+<p>The difference isn't budget or awareness. The chef knows the gadgets exist. They've probably tried most of them. The difference is that the chef has cooked enough meals to know what actually matters versus what just looks like it should help.</p>
+<h2>Software Has a Gadget Drawer Too</h2>
+<p>The software industry has its own version of this kitchen drawer: Kafka, Kubernetes, microservices, event sourcing, CQRS, service mesh. Each one is a real tool that solves a real problem. None of them are wrong.</p>
+<p>But they get adopted the same way the spiraliser, or apple corer does. A conference talk made it look transformative. A blog post made it look easy. The team at the last company used it, so it must be the right call. Everyone seems to have one.</p>
+<p>The cost is higher than a plastic gadget, though. Months of integration work. Operational complexity that never goes away. Cognitive overhead that compounds across the team. And unlike the egg slicer, you can't just leave it in the drawer when it turns out you didn't need it; by the time you realise, it's an egg slicer that requires building control and a structural surveyor to approve if you even think of looking at it.</p>
+<h2>The Knife</h2>
+<p>So what is the equivalent of the 95% tool for a software developer?</p>
+<p>It's not a product. It's not something you can install. The knife is <strong>data structures and algorithms</strong>. Not in the LeetCode sense; not inverting binary trees on a whiteboard to impress an interviewer. In the real sense: knowing how to model a problem. Knowing when a list is enough and when you need a set. Knowing that a queue is the right abstraction before reaching for a queue product. Understanding how data flows through a system, how to normalise it, how to think about access patterns before writing a single line of SQL.</p>
+<p>This is the skill that transfers across every language, framework, and database you'll ever touch. Frameworks change. Languages fall in and out of fashion. The engineer who understands how to structure data and reason about algorithms will outlast every hype cycle, because the knife never goes out of date. Engineers who reason at this level understand that a database is, at its heart, a bunch of interlinked trees and hash maps. A queue is a double-ended array. A distributed compute cluster is a map-reduce engine.</p>
+<p>These underlying structures are everywhere. Like things you can cut in a kitchen that people might want to eat.</p>
+<p>A chef doesn't buy a new knife every year. They sharpen the one they have.</p>
+<h2>The Chopping Board</h2>
+<p>A knife needs a surface to work on. Nobody shows off their chopping board. It's not exciting. You'll never see a conference talk about the merits of a good chopping board. But try doing prep without one.</p>
+<p>A good relational database, be it client/server, embedded, sharded or otherwise, is a chopping board. A monolith is a chopping board. A test suite is a chopping board.</p>
+<p>Not because they're simple. A good chopping board is a precision surface: stable, durable, forgiving on the blade. These tools are the same: powerful, versatile, and deep enough to reward years of increasing skill. Relational databases have been refined for decades. A well-structured monolith with a clean data layer is the most productive architecture most teams will ever need.</p>
+<p>A competent engineer with strong fundamentals, SQL, and a well-structured monolith can build systems that serve millions of users. Schema design, access patterns, state management, domain modelling: these are knife skills applied to a reliable surface. They compound in ways that tool-specific knowledge never does.</p>
+<p>The amateur reaches for a new gadget when something feels hard. The chef reaches for better technique with the tools already on the bench.</p>
+<h2>Earning Your Specialist Tools</h2>
+<p>A chef does own specialist tools. A mandoline for cuts that a knife genuinely cannot match. A thermometer for precision that human senses cannot provide. A stand mixer for tasks where muscle and time aren't enough. But each one earned its place through repeated, specific need; not through aspiration.</p>
+<p>In software, the equivalent is a service for ML inference that is genuinely novel and tricky. An OLAP data analytics system when you genuinely need high-level, flexible analysis of vast reams of data. A search index when your query patterns outgrow what SQL can express.</p>
+<p>The test isn't &quot;does this tool exist&quot; or &quot;could it theoretically help&quot;. It's &quot;have I hit the limit of what the knife can do for this specific task, and can I articulate exactly what that limit is&quot;. If you can't name the constraint, you haven't earned the gadget yet. You're buying the travel waffle-iron.</p>
+<h2>Becoming a Chef</h2>
+<p>The progression from amateur cook to professional chef isn't about acquiring more tools. It's about needing fewer. It's the confidence that comes from depth with fundamentals rather than breadth of toolkit.</p>
+<p>That's what this series is about. Not a tour of the gadget catalogue, but the knife techniques: <a href="/posts/system-state-machine">state machines</a> for modelling how work moves through your system. <a href="/posts/how-to-build-a-data-access-layer">Data layers</a> that keep your options open. <a href="/posts/strategic-monolith-satellites">Architecture patterns</a> that start simple and earn complexity. <a href="/posts/database-as-a-queue">Queue strategies</a> that use what you already have.</p>
+<p>Technique with a good knife. It's enough to build something serious.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/system-state-machine" rel="prev">
+                    <span class="meta-nav">&larr;</span> Your System is a State Machine
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

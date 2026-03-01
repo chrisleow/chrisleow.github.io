@@ -11,6 +11,22 @@
     <atom:link href="https://chrisfrequency.com/rss.xml" rel="self" type="application/rss+xml" />
     
     <item>
+        <title>On Becoming a Software Chef</title>
+        <link>https://chrisfrequency.com/posts/on-becoming-a-software-chef</link>
+        <pubDate>Mon, 02 Mar 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/on-becoming-a-software-chef</guid>
+        <description><![CDATA[At the end of a long day immersed in the world of software and systems, (occasionally in the middle if working from home), I sometimes relax by cooking myself a meal. I am but a lowly home cook, but I feel that I've learned something over the years. When...]]></description>
+    </item>
+    
+    <item>
+        <title>Your System is a State Machine</title>
+        <link>https://chrisfrequency.com/posts/system-state-machine</link>
+        <pubDate>Sun, 01 Mar 2026 00:00:00 GMT</pubDate>
+        <guid isPermaLink="true">https://chrisfrequency.com/posts/system-state-machine</guid>
+        <description><![CDATA[The most common first question in a new system design is "what database should I use"? The second is usually "should this be a microservice"? Both are premature. Before you pick the infrastructure, model the domain. Your system is a state machine whether you...]]></description>
+    </item>
+    
+    <item>
         <title>Strategic Monolith + Satellites</title>
         <link>https://chrisfrequency.com/posts/strategic-monolith-satellites</link>
         <pubDate>Sat, 28 Feb 2026 00:00:00 GMT</pubDate>
@@ -31,7 +47,7 @@
         <link>https://chrisfrequency.com/posts/agile-missing-layer-retrospective</link>
         <pubDate>Sat, 21 Feb 2026 00:00:00 GMT</pubDate>
         <guid isPermaLink="true">https://chrisfrequency.com/posts/agile-missing-layer-retrospective</guid>
-        <description><![CDATA[Agile has a reputation problem. Depending on who you ask, it's either the salvation of software delivery or the source of its dysfunction. Standups that waste everyone's morning. Sprints that deliver activity but not progress. Velocity charts that management...]]></description>
+        <description><![CDATA[Agile has a reputation problem. Depending on who you ask, it's either the salvation of software delivery or the source of its dysfunction. Multiple meetings that waste everyone's time. Sprints that deliver activity but not progress. Velocity charts that...]]></description>
     </item>
     
     <item>

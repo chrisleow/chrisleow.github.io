@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idempotency Is Not Optional | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/idempotency-is-not-optional">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/simplicity-scales" rel="prev">
+                    <span class="meta-nav">&larr;</span> Simplicity Scales
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/audit-logs-done-right" rel="next">
+                    Audit Logs Done Right <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Idempotency Is Not Optional</h1>
+        <p class="post-meta">
+            <time datetime="2026-01-27">
+                January 27, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>A payment processed twice is not a bug report. It is a regulatory incident, a customer complaint, and depending on the jurisdiction, a compliance violation. Most teams treat idempotency as a hardening pass they will get to later. In practice, &quot;later&quot; means &quot;after the first batch of duplicate charges&quot;.</p>
+<p>This is not academic. Financial systems, webhook receivers, queue consumers: anywhere &quot;at least once&quot; delivery exists, idempotency is a correctness requirement, not a nice-to-have. Your system will receive duplicate inputs. The only question is whether it handles them gracefully or pretends they cannot happen.</p>
+<h2>What Idempotency Actually Means</h2>
+<p>An operation is <strong>idempotent</strong> if applying it multiple times produces the same result as applying it once. A database write that sets a status to <code>CONFIRMED</code> is idempotent; running it twice leaves the record in the same state. A write that increments a counter by one is not; running it twice produces a different result than running it once.</p>
+<p>This is distinct from <strong>safety</strong> in the &quot;non-modifying&quot; sense. A safe operation is read-only; it does not change state at all. An idempotent operation does change state, but only once. The second application is absorbed.</p>
+<p>It is also distinct from <strong>exactly-once delivery</strong>, which is a property of infrastructure that almost never holds in practice. Networks drop acknowledgements. Workers crash between processing and committing. Webhook providers retry on timeout. The realistic assumption is &quot;at least once&quot;, and idempotency is what makes &quot;at least once&quot; behave like &quot;exactly once&quot; from the perspective of your data.</p>
+<p><strong>Idempotency is not the same as deduplication.</strong> Deduplication discards duplicates before processing: it requires knowing something is a duplicate before you touch it. Idempotency means processing a duplicate is harmless because the system recognises the work is already done. The distinction matters in practice because deduplication fails when duplicates arrive through different paths or with different metadata. Idempotency handles the case regardless of how the duplicate arrived.</p>
+<p>The prize is a system you can replay with confidence.</p>
+<h2>The Idempotency Key</h2>
+<p>Every write operation has an idempotency key, whether you name it or not.</p>
+<p>This is the central insight, and it is worth sitting with for a moment. When you insert a row, something about that row identifies the intended effect. When you update a record, something about the update identifies which change you meant to apply. That &quot;something&quot; is the idempotency key. It answers one question: <strong>&quot;has this specific intended effect already been applied?&quot;</strong> If you can answer that reliably, you can handle duplicates. If you cannot, you have a correctness gap.</p>
+<p>The key is not always a single field. It might be an event ID from an external system. It might be a composite of <code>entity_id + action + timestamp</code>. It might be a caller-provided UUID in a request header. The important thing is that two requests with the same key represent the same intended operation, and two requests with different keys represent different operations, even if the payload is otherwise identical.</p>
+<p>Most systems already have idempotency keys buried in their data. The work is recognising them, naming them, and enforcing them.</p>
+<h3>Worked Example: Idempotent Audit Log</h3>
+<p>An audit log is a good place to see this in practice because the requirements are strict and the pattern is clean. The log records every state transition in the system. It is append-only: rows are written, never updated or deleted.</p>
+<p>The natural idempotency key is the combination of fields that uniquely identify &quot;this specific thing happened&quot;: the entity, the transition, and when it occurred.</p>
+<div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="n">id</span><span class="w">           </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">entity_type</span><span class="w">  </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">entity_id</span><span class="w">    </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">action</span><span class="w">       </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">old_status</span><span class="w">   </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">),</span>
+<span class="w">    </span><span class="n">new_status</span><span class="w">   </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_by</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">detail</span><span class="w">       </span><span class="n">JSONB</span><span class="p">,</span>
+<span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">    </span><span class="k">UNIQUE</span><span class="w"> </span><span class="p">(</span><span class="n">entity_type</span><span class="p">,</span><span class="w"> </span><span class="n">entity_id</span><span class="p">,</span><span class="w"> </span><span class="n">action</span><span class="p">,</span><span class="w"> </span><span class="n">new_status</span><span class="p">,</span><span class="w"> </span><span class="n">performed_at</span><span class="p">)</span>
+<span class="p">);</span>
+</pre></div>
+<p>Notice the two constraints. The <code>id</code> is the row's identity: used for foreign keys, joins, and application code. The unique constraint on <code>(entity_type, entity_id, action, new_status, performed_at)</code> is the idempotency key: it is what catches duplicates. These are not the same thing. <strong>The primary key identifies the row. The idempotency key identifies the intent.</strong> Sometimes they overlap; a Stripe event ID can serve as both. Often they do not, and designing for both from the start avoids a painful retrofit later.</p>
+<p>The write is a single <code>INSERT ... ON CONFLICT</code>:</p>
+<div class="highlight"><pre><span></span><span class="k">INSERT</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="n">entity_type</span><span class="p">,</span>
+<span class="w">    </span><span class="n">entity_id</span><span class="p">,</span>
+<span class="w">    </span><span class="n">action</span><span class="p">,</span>
+<span class="w">    </span><span class="n">old_status</span><span class="p">,</span>
+<span class="w">    </span><span class="n">new_status</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_by</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_at</span><span class="p">,</span>
+<span class="w">    </span><span class="n">detail</span>
+<span class="p">)</span>
+<span class="k">VALUES</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="s1">&#39;order&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;4821&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;confirmed&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;pending&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;confirmed&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;system&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;2026-03-15T10:30:00Z&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="s1">&#39;{&quot;source&quot;: &quot;webhook&quot;}&#39;</span>
+<span class="p">)</span>
+<span class="k">ON</span><span class="w"> </span><span class="n">CONFLICT</span><span class="w"> </span><span class="p">(</span><span class="n">entity_type</span><span class="p">,</span><span class="w"> </span><span class="n">entity_id</span><span class="p">,</span><span class="w"> </span><span class="n">action</span><span class="p">,</span><span class="w"> </span><span class="n">new_status</span><span class="p">,</span><span class="w"> </span><span class="n">performed_at</span><span class="p">)</span>
+<span class="w">    </span><span class="k">DO</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EXCLUDED</span><span class="p">.</span><span class="n">id</span><span class="p">;</span>
+</pre></div>
+<p>The write is unconditional. No check-before-write. No conditional logic. If the row already exists, the unique constraint catches the conflict and <code>DO UPDATE SET id = EXCLUDED.id</code> overwrites the surrogate id. That is not a no-op; the <code>id</code> may genuinely change if a replay generates a new one. But it is harmless: the idempotency key protects the business-meaningful data, and the <code>id</code> is just a handle. One row per transition, always.</p>
+<p>Replay an entire day of transitions and the log ends up identical to what it would have been with a single pass. That is idempotency in its purest form.</p>
+<p>Audit logs are also the <strong>canary</strong> for idempotency across the rest of your system. If your audit log contains duplicate entries, something upstream processed a transition twice and did not catch it. A clean, deduplicated audit log is evidence that idempotency is working. This connection is explored further in <a href="/posts/audit-logs-done-right">Audit Logs Done Right</a>.</p>
+<p>Testing idempotency is mechanical: call it twice, assert the same outcome.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">test_process_payment_is_idempotent</span><span class="p">():</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">make_test_context</span><span class="p">()</span>
+    <span class="n">payment</span> <span class="o">=</span> <span class="n">make_payment</span><span class="p">(</span><span class="n">amount</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">idempotency_key</span><span class="o">=</span><span class="s2">&quot;pay-001&quot;</span><span class="p">)</span>
+
+    <span class="n">first_result</span> <span class="o">=</span> <span class="n">process_payment</span><span class="p">(</span><span class="n">payment</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+    <span class="n">second_result</span> <span class="o">=</span> <span class="n">process_payment</span><span class="p">(</span><span class="n">payment</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+    <span class="k">assert</span> <span class="n">first_result</span> <span class="o">==</span> <span class="n">second_result</span>
+    <span class="k">assert</span> <span class="n">context</span><span class="o">.</span><span class="n">repositories</span><span class="o">.</span><span class="n">payments</span><span class="o">.</span><span class="n">count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span>
+</pre></div>
+<p>The cost of the test is one extra function call and one extra assertion. The cost of the bug it catches is a regulatory incident.</p>
+<h2>How to Pick Your Key</h2>
+<p>The idempotency key must uniquely identify the <strong>intended effect</strong>, not the request, not the message, not the row. Getting this wrong produces either false positives (treating distinct operations as duplicates) or false negatives (failing to catch real duplicates). This is the hardest part of building an idempotent system, and it is worth thinking about carefully.</p>
+<h3>Natural Keys</h3>
+<p>The best idempotency keys already exist in your domain. They come from the business problem, not from infrastructure.</p>
+<ul>
+<li><strong>A payment callback from Stripe carries an event ID.</strong> That ID is the key. If you receive the same event ID twice, the second is a duplicate.</li>
+<li><strong>An order status change</strong> is identified by <code>order_id + new_status</code>. An order can only be confirmed once; the combination is the natural key for the confirmation operation.</li>
+<li><strong>A webhook delivery from a partner system</strong> carries a transaction reference. That reference is the key.</li>
+<li><strong>A batch processing run</strong> is identified by <code>batch_id + item_id</code>. If the batch re-runs, each item is individually idempotent.</li>
+</ul>
+<p>Natural keys win because they require no coordination between caller and server. They are already present in the data. They are meaningful in the domain, so they appear in logs, dashboards, and debugging sessions. They are the first thing to look for.</p>
+<h3>Caller-Provided Keys</h3>
+<p>When the caller controls the retry logic, the server may have no way to distinguish &quot;new request&quot; from &quot;retry of a previous request&quot; based on the payload alone. In this case, the caller generates a unique key (typically a UUID) and sends it with the request, usually in a header such as <code>Idempotency-Key</code>.</p>
+<p>The server stores the key alongside the result. On duplicate receipt, it returns the stored result without re-executing. This is the standard pattern for APIs. Stripe uses it. Most payment processors use it. It shifts the responsibility for key generation to the caller, which is appropriate when the server cannot infer intent from the payload.</p>
+<p>The risk is straightforward: if the caller generates a new key for each retry (a bug, or a naive integration), the server sees each attempt as a distinct operation. The pattern only works if the caller understands the contract. Document it clearly. For critical endpoints, consider rejecting requests that omit the idempotency key entirely.</p>
+<h3>Composite Keys</h3>
+<p>When no single field identifies the intent, construct a key from a combination of fields. <code>customer_id + action_type + date</code> might identify &quot;this customer's daily settlement&quot;. <code>source_system + source_id + event_type</code> might identify &quot;this specific event from this specific upstream system&quot;.</p>
+<p>The discipline is that the composite must be <strong>stable across retries</strong>. If any component changes between retries (a timestamp that advances, a sequence number that increments), the key changes and the duplicate is not caught. Use fields that describe the intent, not the attempt.</p>
+<p>If you genuinely cannot construct a stable key, ask whether the operation needs idempotency at all. Often it does not.</p>
+<h2>What To Do On Duplicate</h2>
+<p>The key tells you whether something is a duplicate. The right response depends on context.</p>
+<p><strong>Skip</strong>: acknowledge and return the previous result. This is appropriate when the caller is waiting for a response: API endpoints, webhook receivers. The server caches the result alongside the idempotency key; on duplicate receipt, it returns the cached result without re-executing. In SQL, <code>INSERT ... ON CONFLICT DO NOTHING</code> is the simplest form.</p>
+<p><strong>Pass-through (upsert)</strong>: write it again; the write is designed so that reapplying it is harmless. <code>INSERT ... ON CONFLICT DO UPDATE SET value = EXCLUDED.value</code>. This is appropriate for internal writes where nobody is waiting for a cached response: queue consumers, batch processing, data pipelines. Replaying an entire batch is a no-op for items already processed and a catch-up for items that were missed. No conditional logic. No error handling for &quot;already done&quot;. Just write.</p>
+<p>The caveat: upserts work for &quot;set state to X&quot;. They do not work for &quot;increment by N&quot; or &quot;append to list&quot;. Those operations are inherently non-idempotent unless guarded by a separate check. Know which kind of write you are making.</p>
+<h2>The Golden System: Replay-Safe Architecture</h2>
+<p>When every write in a system is idempotent, something fundamental changes in how that system is operated. Replay stops being a risk and becomes a recovery strategy.</p>
+<ul>
+<li><strong>Queue consumer crashes mid-batch.</strong> Restart it. It reprocesses items it already handled; the writes are idempotent, so the duplicates are harmless. No forensic investigation into &quot;which items succeeded and which didn't&quot;.</li>
+<li><strong>Upstream system sends a duplicate batch.</strong> Accept them all. The duplicates are no-ops.</li>
+<li><strong>Incident corrupts some records.</strong> Reprocess the source events from the last known-good point. Idempotent writes restore the correct state without double-counting.</li>
+<li><strong>Deployment goes wrong and a worker processes the same input twice.</strong> No impact.</li>
+</ul>
+<p>The system that handles duplicates gracefully is <strong>simpler to run</strong> than the system that must never receive one. The latter requires perfect infrastructure: exactly-once delivery, no crashes at inopportune moments, no duplicate webhook deliveries. That infrastructure does not exist. The former requires only that each write knows its own identity.</p>
+<p>Teams that do not build for idempotency end up building compensating complexity instead: deduplication layers, message ID caches, reconciliation jobs that run nightly to detect and fix double-processing. The idempotent system does not need any of this. The upfront cost is thinking carefully about keys. The ongoing cost is near zero.</p>
+<h2>When Idempotency Gets Hard</h2>
+<p>Not everything is clean. Two cases are worth naming honestly.</p>
+<p><strong>Partial completion.</strong> A write succeeds but a downstream side effect (an API call, an email, a webhook delivery) fails. On replay, the write is absorbed (idempotent), but the side effect never happened. The state says &quot;done&quot; but the work is incomplete. The solution is to treat the side effect as its own operation with its own key and its own retry mechanism. The parent write is complete; the child retries independently. This is the same principle as <a href="/posts/system-state-machine">sub-state-machines</a>: give the side effect its own lifecycle rather than entangling it with the parent.</p>
+<p><strong>Increments and appends.</strong> Operations like &quot;add £10 to balance&quot; or &quot;append item to list&quot; are inherently non-idempotent. Running them twice produces a different result than running them once. They must be reframed: &quot;set balance to £110&quot; is idempotent; &quot;add £10&quot; is not. Alternatively, guard the increment with a key that prevents it from applying twice. This reframing is the single most common design change when retrofitting idempotency into an existing system, and it is worth thinking about from the start.</p>
+<h2>Summary</h2>
+<p>Every write has a key. Pick it from the domain when you can, accept it from the caller when you must, construct it from stable fields as a fallback.</p>
+<p>Two responses to a duplicate: skip it or write through it. Both absorb the duplicate; the choice depends on whether the caller needs a cached response or not.</p>
+<p>The prize is a replay-safe system: operationally simpler, trivially recoverable, and free from the compensating complexity that non-idempotent systems accumulate over time.</p>
+<p>If every write is idempotent, the audit log records each intended effect exactly once. Clean input, clean history. The implementation of that audit log is the subject of the next article in the series: <a href="/posts/audit-logs-done-right">Audit Logs Done Right</a>.</p>
+<p>This is part of a series on pragmatic architecture for startups and scaleups.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/simplicity-scales" rel="prev">
+                    <span class="meta-nav">&larr;</span> Simplicity Scales
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/audit-logs-done-right" rel="next">
+                    Audit Logs Done Right <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Events, Queues and Signals | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/events-queues-signals">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/on-becoming-a-software-chef" rel="prev">
+                    <span class="meta-nav">&larr;</span> On Becoming a Software Chef
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/simplicity-scales" rel="next">
+                    Simplicity Scales <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Events, Queues and Signals</h1>
+        <p class="post-meta">
+            <time datetime="2025-12-18">
+                December 18, 2025
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>The default &quot;event-driven architecture&quot; looks like this: lots of small services connected by queues, with event objects flowing between them. Events, signals, and queues get lumped together as one concept. &quot;An event is a data structure that sits on a queue and acts as a signal&quot;. All three conflated into a single architectural primitive.</p>
+<p>This is not necessarily wrong at scale, but it gets adopted by default long before scale justifies it. The complexity cost is real: state scattered across services, no single place to trace what happened and why, distributed debugging as the norm rather than the exception.</p>
+<p>You have probably seen this system. A constellation of services with queues of fat JSON objects flowing between them. In theory it is flexible: &quot;you can just read from the queue&quot;. In practice, changing a single field means coordinating across five teams to agree on a data model.</p>
+<p>All I wanted to do was send a welcome email and a webhook.</p>
+<p>The underlying idea is sound. Designing a system around things that happen, rather than procedures that execute, produces code that is easier to extend, easier to test, and easier to reason about. The problem is not the thinking; it is the assumption that the thinking requires a particular infrastructure. &quot;Event-driven&quot; has become synonymous with &quot;queue-driven&quot;, and the two are not the same thing.</p>
+<h2>Untangling the Concepts</h2>
+<p>There are three distinct things here, each with its own purpose:</p>
+<ul>
+<li><strong>An event</strong> is a domain model. A record of something that happened. It has a shape, a meaning, and a place in the domain. It is data, not infrastructure.</li>
+<li><strong>A queue</strong> is a storage and access pattern: a list with frontier or claim semantics. It is infrastructure, not domain modelling. (See <a href="/posts/database-as-a-queue">Your Database is Already a Queue</a> for an example.)</li>
+<li><strong>A signal</strong> is an in-process notification that something happened. A function call with a subscriber list. Zero infrastructure.</li>
+</ul>
+<p>Treating all three as one thing, &quot;event-driven&quot;, leads teams to reach for a queue every time something needs to react to something else. Most of the time, a signal is sufficient.</p>
+<h2>Events as Domain Models</h2>
+<p>An event, properly modelled, is a first-class domain record. It captures <strong>who</strong> performed the action, <strong>what</strong> changed, <strong>when</strong> it happened, the <strong>prior and new state</strong>, and the <strong>context</strong> that made the change meaningful. It belongs in your domain layer, not your infrastructure.</p>
+<p>This distinction matters because of how teams typically encounter events. The first time most codebases model an event, it is as a message format: a JSON blob shaped for a specific consumer, with fields chosen for serialisation convenience rather than domain clarity. That gets the relationship backwards. The event is the domain's authoritative record of what happened. A queue message is one possible projection of that record, shaped for a particular delivery mechanism.</p>
+<p>Model events the same way you model any other domain concept: as typed, immutable structures with explicit fields.</p>
+<div class="highlight"><pre><span></span><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderStatusChanged</span><span class="p">:</span>
+  <span class="n">order_id</span><span class="p">:</span> <span class="nb">str</span>
+  <span class="n">previous_status</span><span class="p">:</span> <span class="n">OrderStatus</span>
+  <span class="n">new_status</span><span class="p">:</span> <span class="n">OrderStatus</span>
+  <span class="n">changed_by</span><span class="p">:</span> <span class="nb">str</span>
+  <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span>
+  <span class="n">timestamp</span><span class="p">:</span> <span class="n">datetime</span>
+</pre></div>
+<p><strong><code>frozen=True</code></strong> is the quiet enforcer here. An event is a record of something that already happened; it should be immutable by construction. If you find yourself mutating an event after creation, you are not recording history; you are editing it.</p>
+<p>Notice what is missing: no <code>queue_name</code>, no <code>routing_key</code>, no <code>serialization_format</code>. Those are concerns of the delivery mechanism, not the domain. When the time comes to put this on a queue or write it to a log, you project it into whatever shape the consumer needs. The domain model stays clean.</p>
+<p>Events recorded as data are the foundation for audit trails, replay, and debugging. They exist independently of whether they ever touch a queue. A well-modelled event can be written to an append-only table, projected onto a queue, or fed into an analytics pipeline; all without changing its shape. The domain said what happened; the infrastructure decides who needs to know.</p>
+<h3>Fat Events, Thin Messages</h3>
+<p>The domain event should be rich. The message you send does not have to be.</p>
+<p>There is a much underused pattern where the notification carries only a type and an identifier: &quot;order 4821 changed status&quot;. The consumer receives the signal, fetches the current state from the source of truth, and works with that. No fat JSON payloads duplicated across queues. No versioning headaches when the event schema evolves. No stale data baked into a message that sat on a queue for thirty seconds while the record was updated again.</p>
+<p>This works because the domain event and the delivery message are separate concerns. The event is your rich, immutable record in the domain layer. The message is a notification that something worth knowing about has happened. Keeping them separate means you can change what a consumer reads without changing what a producer writes. It also means the consumer always sees the latest state, not a snapshot from the moment the message was published.</p>
+<p>The pattern applies at every level of the escalation ladder. A signal can carry just an ID. A queue message can carry just an ID. Even a broker message can carry just an ID. The richer the payload you put on the wire, the tighter the coupling between producer and consumer, and the more likely you are to end up coordinating across five teams to change a field.</p>
+<h2>Signals: The Forgotten Power Tool</h2>
+<p>Signals encapsulate reactions within a process boundary. They coordinate complex operations without distributed infrastructure, and they are simple to implement: the full mechanism is a registry and a loop. If you have used <code>notify(Signal.PROCESSING_STARTED, updated, context)</code> from <a href="/posts/system-state-machine">Your System is a State Machine</a>, you have already used one. That was a signal, not a queue message.</p>
+<p>Signals are ideal for audit logging, notifying downstream consumers, triggering secondary writes, billing event capture, and sending notifications. They do have a limitation: they are synchronous and in-process. They are not suitable for heavy processing that needs retries, independent failure handling, or work that should survive a process restart. But for the vast majority of &quot;something happened, now react&quot; cases inside a monolith, a signal is the right tool.</p>
+<p>The entire pattern fits in a single file. Here is the whole thing:</p>
+<div class="highlight"><pre><span></span><span class="c1"># --- Domain layer: define your signal types ---</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Signal</span><span class="p">:</span>
+  <span class="k">pass</span>
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderCreatedSignal</span><span class="p">(</span><span class="n">Signal</span><span class="p">):</span>
+  <span class="n">new_order</span><span class="p">:</span> <span class="n">Order</span>
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OrderUpdatedSignal</span><span class="p">(</span><span class="n">Signal</span><span class="p">):</span>
+  <span class="n">old_order</span><span class="p">:</span> <span class="n">Order</span>
+  <span class="n">new_order</span><span class="p">:</span> <span class="n">Order</span>
+
+<span class="o">...</span>
+
+<span class="c1"># --- Infrastructure: a generic registry wired up at startup ---</span>
+
+<span class="n">S</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;S&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">Signal</span><span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SignalHandlerRegistry</span><span class="p">:</span>
+
+  <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">:</span> <span class="n">Context</span> <span class="o">=</span> <span class="n">context</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">Signal</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Signal</span><span class="p">,</span> <span class="n">Context</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+  <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signal</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">S</span><span class="p">],</span> <span class="n">handler</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">S</span><span class="p">,</span> <span class="n">Context</span><span class="p">],</span> <span class="kc">None</span><span class="p">]):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="nb">list</span><span class="p">())</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+  <span class="k">def</span><span class="w"> </span><span class="nf">notify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signal</span><span class="p">:</span> <span class="n">Signal</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="vm">__class__</span><span class="p">,</span> <span class="p">()):</span>
+      <span class="n">handler</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">)</span>
+
+<span class="o">...</span>
+
+<span class="c1"># --- Application code: fire a signal after a state transition ---</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">application_code</span><span class="p">():</span>
+  <span class="o">...</span>
+
+  <span class="n">registry</span><span class="o">.</span><span class="n">signals</span><span class="o">.</span><span class="n">notify</span><span class="p">(</span><span class="n">OrderCreatedSignal</span><span class="p">(</span><span class="n">order</span><span class="p">))</span>
+</pre></div>
+<p><strong>Signal types live in the domain layer.</strong> Each signal is a simple dataclass carrying the data a handler needs. The base <code>Signal</code> class exists purely for the type constraint; it carries no behaviour. You define one signal per meaningful thing that happened, not per consumer.</p>
+<p><strong>The registry is generic infrastructure.</strong> <code>SignalHandlerRegistry</code> is the entire engine: a dictionary mapping signal types to handler lists, a <code>register</code> method to wire them up, and a <code>notify</code> method that loops through the matching handlers. The <code>Context</code> object is a single container holding all repositories and services, injected at startup (the full pattern is in <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>). It gives handlers access to the data layer and other services without coupling them to global state. You wire this up once at application startup.</p>
+<p><strong>Calling code stays ignorant of who is listening.</strong> The application fires <code>OrderCreatedSignal(order)</code> and moves on. Whether that triggers an audit log write, a notification, or nothing at all is a configuration concern, not a caller concern. Adding a new reaction means registering one more handler; the code that created the order never changes.</p>
+<h3>Collapsing the Queue Chain</h3>
+<p>Consider a common order flow. The order service publishes to an &quot;order created&quot; queue. A billing service reads from that queue and publishes to a &quot;billing initiated&quot; queue. A notification service reads from both queues to decide whether to send a welcome email. An audit service reads from yet another queue to write a log entry. Four services, four queues, four deployment pipelines, four sets of retry logic, four places where a message can silently disappear.</p>
+<div class="highlight"><pre><span></span>  <span class="c">┌───────────────┐</span>
+  <span class="c">│</span> Order Service <span class="c">│</span>
+  <span class="c">└───────┬───────┘</span>
+          <span class="c">│</span> [queue]
+    <span class="c">┌─────┴──────────────┐</span>
+    ▼                    ▼
+ <span class="c">┌──────────┐</span>      <span class="c">┌───────────┐</span>
+ <span class="c">│</span> Billing  <span class="c">│</span>      <span class="c">│</span>   Audit   <span class="c">│</span>
+ <span class="c">└─────┬────┘</span>      <span class="c">└───────────┘</span>
+       <span class="c">│</span> [queue]
+       ▼
+ <span class="c">┌──────────────┐</span>
+ <span class="c">│</span>Notifications <span class="c">│</span>
+ <span class="c">└──────────────┘</span>
+</pre></div>
+<p>Now ask: do any of these actually need to be separate processes? Billing is a database write. The welcome email is an API call to your email provider. The audit log is another database write. None of them are computationally heavy. None of them need an independent deployment lifecycle. None of them need to survive a process restart. They became separate services because the default assumption was &quot;reaction means queue&quot;, when a function call would have done.</p>
+<p>Replace the queues with signals and the entire flow collapses into the order service itself:</p>
+<div class="highlight"><pre><span></span><span class="c1"># At startup: register handlers for the OrderCreated signal</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">OrderCreatedSignal</span><span class="p">,</span> <span class="n">create_billing_record</span><span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">OrderCreatedSignal</span><span class="p">,</span> <span class="n">send_welcome_email</span><span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">OrderCreatedSignal</span><span class="p">,</span> <span class="n">write_audit_log</span><span class="p">)</span>
+</pre></div>
+<p>Three lines of registration. The order service creates the order, fires <code>OrderCreatedSignal(order)</code>, and the registry calls each handler in sequence. The billing record is written in the same transaction. The audit log is written alongside it. The email is dispatched in the same process. If any handler fails, you know immediately, in the same call stack, with a real stack trace instead of a dead letter queue.</p>
+<p>You have not lost flexibility. Adding a new reaction is still just registering another handler. You have not created a monolithic tangle; each handler is a small, focused function with a single responsibility. What you have lost is four queues, four services, and the operational burden that came with them.</p>
+<h2>The Escalation Ladder: Signal → Queue → Broker</h2>
+<div class="highlight"><pre><span></span>  <span class="c">┌──────────────────────────────────────────┐</span>
+  <span class="c">│</span>                 Signal                   <span class="c">│</span>
+  <span class="c">│</span>  in-process · synchronous · zero infra   <span class="c">│</span>
+  <span class="c">└──────────────────┬───────────────────────┘</span>
+                     <span class="c">│</span> heavy work, needs retries,
+                     <span class="c">│</span> or must not block caller
+                     ▼
+  <span class="c">┌──────────────────────────────────────────┐</span>
+  <span class="c">│</span>                  Queue                   <span class="c">│</span>
+  <span class="c">│</span>  async · durable · retry-capable         <span class="c">│</span>
+  <span class="c">└──────────────────┬───────────────────────┘</span>
+                     <span class="c">│</span> cross-process delivery,
+                     <span class="c">│</span> independent services
+                     ▼
+  <span class="c">┌──────────────────────────────────────────┐</span>
+  <span class="c">│</span>                  Broker                  <span class="c">│</span>
+  <span class="c">│</span>  distributed · multi-consumer            <span class="c">│</span>
+  <span class="c">└──────────────────────────────────────────┘</span>
+</pre></div>
+<ul>
+<li><strong>Start with signals.</strong> If the reaction is lightweight, in-process, and failure means the parent operation also fails, a signal is the right tool. It can even remain the right tool when enqueuing a future work item in another system. Most reactions in a monolith fall here.</li>
+<li><strong>Graduate to a queue</strong> when the work is heavy, needs retries, or should not block the parent operation. The queue is a delivery mechanism, not an architectural commitment.</li>
+<li><strong>Graduate to a broker</strong> when you genuinely need durable, cross-process delivery: independent services with their own deployment lifecycle consuming the same events. This is the &quot;earn the gadget&quot; threshold. If you can't name the specific constraint that a signal or a simple queue cannot satisfy, you haven't reached it. The operational and cognitive overhead is significant; make sure you are buying something with it.</li>
+</ul>
+<h2>Summary</h2>
+<p>Events are domain models. Queues are infrastructure. Signals are in-process coordination. Three distinct concepts, not one fuzzy one.</p>
+<p>Start with signals. Escalate to a queue when concrete constraints demand it. Reach for a broker only when cross-process delivery is genuinely required.</p>
+<p>The welcome email that triggered a five-team coordination exercise should have been a signal and a function call. Most of your &quot;event-driven&quot; reactions should be too.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/on-becoming-a-software-chef" rel="prev">
+                    <span class="meta-nav">&larr;</span> On Becoming a Software Chef
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/simplicity-scales" rel="next">
+                    Simplicity Scales <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

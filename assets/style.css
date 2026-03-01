@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=JetBrains+Mono&family=Oswald:wght@700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Oswald:wght@700&display=swap");
 
 html {
   font-size: 105%; /* Boost base font size for better readability */
@@ -208,8 +208,7 @@ code {
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-size: 85%;
-  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
-    Menlo, monospace;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 /* Reset for code inside pre blocks, so pre styling takes over */
@@ -229,8 +228,8 @@ pre {
   padding: 1rem;
   overflow-x: auto;
   font-size: 0.85rem; /* Adjusted to compensate for root font size increase */
-  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
-    Menlo, monospace;
+  line-height: 1.4; /* Tighter than body (1.6) so box-drawing chars tile flush */
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 /* --- Syntax Highlighting (Pygments) --- */
@@ -326,14 +325,3 @@ pre .n {
     margin-left: 5px;
 }
 
-/* --- Mermaid Diagrams --- */
-
-.mermaid-diagram {
-  margin: 2rem 0;
-  text-align: center;
-}
-
-.mermaid-diagram svg {
-  max-width: 100%;
-  height: auto;
-}

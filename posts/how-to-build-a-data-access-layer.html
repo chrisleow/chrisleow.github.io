@@ -28,10 +28,6 @@
     <nav class="post-navigation post-navigation-top">
         <div class="nav-previous">
             
-                <a href="https://chrisfrequency.com/posts/introduction" rel="prev">
-                    <span class="meta-nav">&larr;</span> Hello, and Welcome!
-                </a>
-            
         </div>
         <div class="nav-next">
             
@@ -47,8 +43,8 @@
     <header class="post-header">
         <h1>How to Build a Data Access Layer</h1>
         <p class="post-meta">
-            <time datetime="2025-07-26">
-                July 26, 2025
+            <time datetime="2025-07-23">
+                July 23, 2025
             </time>
         </p>
     </header>
@@ -91,6 +87,19 @@
 </ol>
 <p>This style limits the resulting application's data code's flexibility, testability and ease of future refactorings.</p>
 <p>We will expand on the reasons why in the following sections.</p>
+<div class="highlight"><pre><span></span>  <span class="c">┌──────────────────────────────┐</span>
+  <span class="c">│</span>       Application Code       <span class="c">│</span>
+  <span class="c">│</span>                              <span class="c">│</span>
+  <span class="c">│</span>  obj.save()                  <span class="c">│</span>
+  <span class="c">│</span>  Class.query(params) <span class="c">────────┼──</span>▶ unpredictable queries
+  <span class="c">│</span>  obj.related_object <span class="c">─────────┼──</span>▶ hidden database call
+  <span class="c">└──────────────┬───────────────┘</span>
+                 <span class="c">│</span>
+                 ▼
+          <span class="c">┌─────────────┐</span>
+          <span class="c">│</span>   Database  <span class="c">│</span>
+          <span class="c">└─────────────┘</span>
+</pre></div>
 <p><em>This article is neutral on the usefulness (in general) of ORMs. It should be noted that use of ORMs can be a very good idea in some circumstances, when hidden behind a properly defined data access layer, and regarded as an implementation detail.</em></p>
 <h3>Unpredictable queries</h3>
 <p>The <code>query</code> class method exposes the <code>params</code> parameter, which allows for any kind of filter to be specified in the application code. Think of Java's Hibernate Query Language (HQL), Django's keyword argument filters, or the equivalent in your ORM of choice.</p>
@@ -164,6 +173,13 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">FakeBlogPostProvider</span><span class="p">(</span><span class="n">BlogPostProvider</span><span class="p">):</span>
     <span class="k">pass</span>  <span class="c1"># implementation omitted</span>
 </pre></div>
+<div class="highlight"><pre><span></span>  <span class="c">┌──────────────────────────────┐</span>
+  <span class="c">│</span>       Application Code       <span class="c">│</span>
+  <span class="c">└──────────────┬───────────────┘</span>
+                 <span class="c">│</span> BlogPostProvider (interface)
+                 <span class="c">├──────────────</span>▶ SQLBlogPostProvider  <span class="c">──</span>▶ Database
+                 <span class="c">└──────────────</span>▶ FakeBlogPostProvider <span class="c">──</span>▶ In-Memory
+</pre></div>
 <p>Note that the providers can use any technology to fulfil the interface contract, and can connect to any kind of SQL or NoSQL database using direct queries, ORMs, or any other framework.</p>
 <p>We can then inject the concrete provider implementations in place of the interface in application code, and use this to consume and update data in the application, with the following benefits:</p>
 <h2>The Benefits</h2>
@@ -217,6 +233,26 @@
 <li>Write to both old and new providers, read from new.</li>
 <li>Write to new provider only (migration complete).</li>
 </ol>
+<div class="highlight"><pre><span></span>  <span class="c">┌──────────────────────────────┐</span>
+  <span class="c">│</span>       Application Code       <span class="c">│</span>
+  <span class="c">└──────────────┬───────────────┘</span>
+                 <span class="c">│</span>
+                 ▼
+  <span class="c">┌──────────────────────────────┐</span>
+  <span class="c">│</span>    MigrationProxyProvider    <span class="c">│</span>
+  <span class="c">└──────────┬──────────┬────────┘</span>
+             <span class="c">│</span>          <span class="c">│</span>
+             ▼          ▼
+      <span class="c">┌──────────┐</span>  <span class="c">┌──────────┐</span>
+      <span class="c">│</span> Old Store<span class="c">│</span>  <span class="c">│</span> New Store<span class="c">│</span>
+      <span class="c">└──────────┘</span>  <span class="c">└──────────┘</span>
+
+  Step 1  writes <span class="c">──</span>▶ old              reads ◀<span class="c">──</span> old
+  Step 2  writes <span class="c">──</span>▶ old + new        reads ◀<span class="c">──</span> old
+  Step 3  backfill old <span class="c">──</span>▶ new
+  Step 4  writes <span class="c">──</span>▶ old + new        reads ◀<span class="c">──</span> new
+  Step 5  writes <span class="c">──</span>▶ new              reads ◀<span class="c">──</span> new
+</pre></div>
 <p>This allows a full migration from one datastore to another, assuming we can deploy services without downtime using Kubernetes or similar orchestration systems.</p>
 <p>A real benefit in mission-critical systems!</p>
 <h2>The Investment: Acknowledging the Upfront Cost</h2>
@@ -234,6 +270,7 @@
 <h2>Conclusion</h2>
 <p>The choice between an ad-hoc data access pattern and a disciplined one is not a technical detail; it's a strategic decision about the kind of system you want to build. While the initial convenience of patterns like Active Record is tempting, the long-term cost in complexity, fragility, and fear of change is immense.</p>
 <p>By investing in a well-defined data access layer with immutable models, you are buying future flexibility. You are creating a system that can be tested with confidence, refactored without fear, and scaled to meet new challenges. This is a very valuable property for any fast-moving, rapidly scaling organisation. For example, at ComplyAdvantage, this approach has been critical in managing growth and complexity.</p>
+<p>For how the data layer becomes the foundation for deferring technology choices and scaling incrementally, see <a href="/posts/defer-the-database-not-the-design">Defer the Database, Not the Design</a>.</p>
 
     </div>
 
@@ -241,10 +278,6 @@
     
     <nav class="post-navigation post-navigation-bottom">
         <div class="nav-previous">
-            
-                <a href="https://chrisfrequency.com/posts/introduction" rel="prev">
-                    <span class="meta-nav">&larr;</span> Hello, and Welcome!
-                </a>
             
         </div>
         <div class="nav-next">

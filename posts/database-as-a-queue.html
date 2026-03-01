@@ -35,6 +35,10 @@
         </div>
         <div class="nav-next">
             
+                <a href="https://chrisfrequency.com/posts/system-state-machine" rel="next">
+                    Your System is a State Machine <span class="meta-nav">&rarr;</span>
+                </a>
+            
         </div>
     </nav>
     
@@ -43,8 +47,8 @@
     <header class="post-header">
         <h1>Your Database is Already a Queue</h1>
         <p class="post-meta">
-            <time datetime="2026-02-26">
-                February 26, 2026
+            <time datetime="2025-11-03">
+                November 3, 2025
             </time>
         </p>
     </header>
@@ -331,16 +335,16 @@
 <li>Items stuck in-flight belonging to customers whose accounts are now suspended</li>
 </ul>
 <p>These cross-cutting questions would require pulling data from two separate systems and correlating them in application code or a data warehouse. With a database queue they are just queries: expressible in a single SQL statement, runnable on demand, and trivially added to the same scheduled export as the standard metrics above.</p>
-<h2>What's a Few Thousand Items a Second?</h2>
-<p>All three patterns can work wonderfully and easily handle a few thousand work items per second at the very least.  Some of the <a href="https://en.wikipedia.org/wiki/Architecture_astronaut">architecture astronauts</a> out there may scoff, but to put this into context, this is thousands of work items per second day in, day out.  That's <em>tens or hundreds of billions of work items per year</em> at a minimum before you have to start thinking about expanding the system.  Think carefully, are you really processing that much?</p>
-<p>In this case, you have the following options:</p>
+<h2>When You Outgrow It</h2>
+<p>Thousands of items per second, sustained, is tens or hundreds of billions of items per year. Most products never get there. If you are not sure whether you have outgrown the database approach, you probably have not.</p>
+<p>When the signals are clear (vacuum pressure climbing, claim query latency degrading under load, worker concurrency hitting connection pool limits), the headroom available before reaching for a broker is larger than most teams expect:</p>
 <ul>
 <li><strong>Tune first.</strong> Batch more aggressively, increase worker concurrency, optimise connection pooling. There is usually more headroom here than expected.</li>
 <li><strong>Partition the table.</strong> Postgres table partitioning by <code>customer_id</code> (or a suitable key) requires no application changes and significantly reduces vacuum pressure.</li>
 <li><strong>Shard.</strong> If you are using a shardable solution like CitusDB and <code>customer_id</code> is already in your schema as a natural partition key, horizontal sharding is a well-scoped change.</li>
 </ul>
 <h2>Summary</h2>
-<p>For a small minority of development teams, this won't be enough.  Anyone out there who <strong>really</strong> need a dedicated solution; you know who you are.  For the rest of us, a database-backed solution delivers plenty of headroom, and is already running, already monitored, and already the source of truth. A queue table adds almost nothing to your operational burden.</p>
+<p>A database-backed queue is already running, already monitored, and already the source of truth. A queue table adds almost nothing to your operational burden. When you genuinely need a dedicated broker, you will know: the constraints are measurable, not hypothetical.</p>
 <p>Three patterns, each suited to a different problem:</p>
 <ul>
 <li><strong>Basic pattern</strong>: crash-safe, multi-worker processing using <code>FOR UPDATE SKIP LOCKED</code> and the lock-via-future-timestamp mechanic. The right starting point for most use cases.</li>
@@ -348,6 +352,7 @@
 <li><strong>Fair queuing (delay)</strong>: a frontier table to space items evenly across time rather than firing in bursts. More complex, but the right tool when downstream systems are sensitive to burst load.</li>
 </ul>
 <p>The schema is consistent across all three: a queue table separate from your business data, <code>customer_id</code> denormalised in where needed, partial indexes for efficiency, and a GIN index for error observability.</p>
+<p>For how database queues fit into the broader architecture, see <a href="/posts/strategic-monolith-satellites">Strategic Monolith + Satellites</a>.</p>
 <p>Happy queuing.</p>
 
     </div>
@@ -363,6 +368,10 @@
             
         </div>
         <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/system-state-machine" rel="next">
+                    Your System is a State Machine <span class="meta-nav">&rarr;</span>
+                </a>
             
         </div>
     </nav>

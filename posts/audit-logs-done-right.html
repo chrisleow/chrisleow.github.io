@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs Done Right | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/audit-logs-done-right">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/idempotency-is-not-optional" rel="prev">
+                    <span class="meta-nav">&larr;</span> Idempotency Is Not Optional
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/fake-it-while-you-make-it" rel="next">
+                    Fake It While You Make It <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>Audit Logs Done Right</h1>
+        <p class="post-meta">
+            <time datetime="2026-02-13">
+                February 13, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Most audit logs are full of lies.</p>
+<p>Not malicious ones. They are lies of omission: the row that got updated in place and took the history with it; the audit write that was added to three of five code paths and nobody noticed the gap; the log that records the final state but not how it got there. The system says the record is <code>APPROVED</code>. The audit log says nothing useful.</p>
+<p>This is not too hard to solve, but it requires upfront design; it is difficult to bolt-on later.</p>
+<h2>Why Most Audit Logs Fail</h2>
+<p>The failure modes are consistent:</p>
+<ul>
+<li><strong>Mutable records</strong>: A status column gets overwritten, the previous value is gone, and there is no way to reconstruct what it was.</li>
+<li><strong>Partial coverage</strong>: Audit writes were added to the obvious code paths when the feature was built, but the edge cases and admin tools that make &quot;corrections&quot; were never instrumented.</li>
+<li><strong>Insufficient data</strong>: The log records that a transition happened but not what the entity looked like before or after it.</li>
+<li><strong>Late addition</strong>: The system went to production without an audit log, and retrofitting one means touching every write path, which nobody has time to do thoroughly.</li>
+</ul>
+<p>The result is an audit log that cannot be trusted. Worse: one that cannot be trusted but looks like it can.</p>
+<h2>Design for Auditability from the Start</h2>
+<p>In a regulated industry, this is <strong>not optional</strong>. Financial services, healthcare, KYC/AML, payments: regulators require a complete, tamper-proof record of what happened, when, and by whom. &quot;We didn't think about that&quot; is not a defensible position here.</p>
+<p>Outside regulated industries, the argument still holds. Customer disputes. Incident post-mortems. Support tickets that arrive six months after the fact. The question &quot;what exactly changed, and when?&quot; comes up constantly in production systems. The team without an audit log answers it by correlating application logs, database snapshots, and guesswork. The team with one writes a query.</p>
+<p>The cost of building for auditability from day one is low: one extra table, one extra write per transition, one structural constraint. The cost of retrofitting it into a live system is high, and the result is never as trustworthy as the version built in from the start, because retrofits have gaps.</p>
+<p>Design for it first. Treat it as infrastructure, not a feature.</p>
+<h2>Audit as a Cross-Cutting Concern</h2>
+<p>Audit logging touches every state-writing path in the system. That is the problem. Handle it naively and you scatter audit writes throughout the codebase: one in each orchestration function, one in each service method, each slightly different, some missing. The coverage is never complete, and the fields are never consistent.</p>
+<p>Two patterns fit naturally with the rest of this series. They are not the only approaches: many frameworks offer their own decoupling mechanisms. But both work well without introducing new dependencies.</p>
+<h3>Pattern 1: Signal Handlers</h3>
+<p>If you are using the signal pattern from <a href="/posts/system-state-machine">Your System is a State Machine</a> and <a href="/posts/events-queues-signals">Events, Queues and Signals</a>, the audit write is a signal handler.</p>
+<p>Every state transition fires a signal. Registering an audit handler for that signal writes the log entry in the same transaction. The business logic does not change; adding the handler is one registration line:</p>
+<div class="highlight"><pre><span></span><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">OrderConfirmedSignal</span><span class="p">,</span> <span class="n">write_audit_log</span><span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KYCApprovedSignal</span><span class="p">,</span>    <span class="n">write_audit_log</span><span class="p">)</span>
+<span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KYCRejectedSignal</span><span class="p">,</span>    <span class="n">write_audit_log</span><span class="p">)</span>
+</pre></div>
+<p>The handler receives the signal, which carries the old and new state. It writes the audit row. The business logic that fired the signal has no knowledge of or dependency on the audit system.</p>
+<p>The strength of this pattern is semantic richness: each signal type is a named, meaningful domain event. The handler knows not just that a write occurred but that a KYC check was approved by a specific actor for a specific reason. The audit record reflects that.</p>
+<p>The limitation is coverage: signals only fire for transitions you have explicitly modelled. Writes that do not go through the signal system are not captured.</p>
+<h3>Pattern 2: Auditing Proxy</h3>
+<p>The proxy pattern wraps the real data provider and writes an audit record after every write, transparently. The structure is the same as the migration proxy in <a href="/posts/how-to-build-a-data-access-layer">How to Build a Data Access Layer</a>, applied to audit concerns:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">AuditingKYCCheckRepository</span><span class="p">(</span><span class="n">KYCCheckRepository</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inner</span><span class="p">:</span>     <span class="n">KYCCheckRepository</span><span class="p">,</span>
+        <span class="n">audit_log</span><span class="p">:</span> <span class="n">AuditLogRepository</span><span class="p">,</span>
+        <span class="n">actor</span><span class="p">:</span>     <span class="nb">str</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inner</span>     <span class="o">=</span> <span class="n">inner</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_audit_log</span> <span class="o">=</span> <span class="n">audit_log</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_actor</span>     <span class="o">=</span> <span class="n">actor</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old</span><span class="p">:</span> <span class="n">KYCCheck</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="n">KYCCheck</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inner</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">new</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_audit_log</span><span class="o">.</span><span class="n">record</span><span class="p">(</span>
+            <span class="n">entity_type</span>  <span class="o">=</span> <span class="s2">&quot;kyc_check&quot;</span><span class="p">,</span>
+            <span class="n">entity_id</span>    <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">new</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+            <span class="n">action</span>       <span class="o">=</span> <span class="s2">&quot;updated&quot;</span><span class="p">,</span>
+            <span class="n">old_status</span>   <span class="o">=</span> <span class="n">old</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">new_status</span>   <span class="o">=</span> <span class="n">new</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">performed_by</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_actor</span><span class="p">,</span>
+            <span class="n">performed_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">),</span>
+            <span class="n">detail</span>       <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;old&quot;</span><span class="p">:</span> <span class="n">old</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span> <span class="s2">&quot;new&quot;</span><span class="p">:</span> <span class="n">new</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()},</span>
+        <span class="p">)</span>
+</pre></div>
+<p><code>save()</code> takes both <code>old</code> and <code>new</code>: the proxy needs both to record the transition. With immutable domain models this is natural, since the caller always has both objects at the call site. The application calls <code>save()</code> on what it believes is a plain repository. The proxy writes to the real store, then writes the audit record. Nothing in the business logic changes.</p>
+<p>The strength of this pattern is comprehensive coverage: every write through the data layer is captured, with no dependency on the signal system being consistently wired. It is well suited to adding audit coverage to an existing codebase, or as a safety net for write paths that fall outside the signal system.</p>
+<p>The trade-off is context. The proxy knows what was written but not necessarily why. A signal handler can record the reason for a referral decision; the proxy records only that a <code>save()</code> call occurred.</p>
+<p><strong>Choosing between them:</strong> the two patterns can coexist. Use signal handlers where semantic context matters: state transitions, approvals, manual decisions. Use the auditing proxy as a safety net for everything else, or as the primary mechanism when instrumenting an existing codebase without a signal system.</p>
+<h2>What to Capture: The Retention Spectrum</h2>
+<p>Once you have decided how to wire audit logging in, you need to decide how much each record captures. There is a spectrum, and the right point depends on domain and regulatory requirements.</p>
+<p><strong>Full model snapshots.</strong> Serialise the old and new model in full as a <code>JSONB</code> column. Every field, at the moment of the transition. This gives complete reconstructibility: the exact state of any entity at any point in time, including fields that seemed unimportant when the schema was written.</p>
+<p>The immutable model pattern from this series makes this natural. A <code>KYCCheck</code> is a <code>NamedTuple</code>; <code>old._asdict()</code> and <code>new._asdict()</code> are single calls. Before and after are already distinct objects, so capturing them costs almost nothing in code.</p>
+<p>The cost is storage. A system writing full snapshots on every transition may store several times more data than one recording only state changes. On a high-throughput pipeline this matters; on a typical transactional system, storage is almost certainly cheaper than the engineering time spent answering questions the log cannot answer.</p>
+<p><strong>Selective field capture.</strong> Record old and new values only for the fields that matter: status, decision reason, risk score, key identifiers. A reasonable middle ground when storage is genuinely constrained and the compliance-relevant fields are well understood. The risk: the field you chose not to capture is the one that becomes important. Be conservative with what you exclude.</p>
+<p><strong>State transitions only.</strong> Record the fact that a transition occurred: entity, action, old status, new status, who, when. No field-level detail. Adequate for many domains where the state machine captures everything meaningful. For fintech and KYC/AML specifically, this is almost certainly insufficient: regulators want to know what data was presented at the time of the decision, not just that a decision was made.</p>
+<p>Choose the level your domain requires, and document why. Changing strategy later means migrating historical records or accepting inconsistency in the log.</p>
+<h2>The Schema</h2>
+<p>Building on the audit log introduced in <a href="/posts/idempotency-is-not-optional">Idempotency Is Not Optional</a>:</p>
+<div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="n">id</span><span class="w">           </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">             </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">entity_type</span><span class="w">  </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">              </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">entity_id</span><span class="w">    </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">             </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">action</span><span class="w">       </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">              </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">old_status</span><span class="w">   </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">),</span>
+<span class="w">    </span><span class="n">new_status</span><span class="w">   </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w">              </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_by</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">             </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="n">detail</span><span class="w">       </span><span class="n">JSONB</span><span class="p">,</span>
+<span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w">  </span><span class="p">(</span><span class="n">id</span><span class="p">),</span>
+<span class="w">    </span><span class="k">UNIQUE</span><span class="w">       </span><span class="p">(</span><span class="n">entity_type</span><span class="p">,</span><span class="w"> </span><span class="n">entity_id</span><span class="p">,</span><span class="w"> </span><span class="n">action</span><span class="p">,</span><span class="w"> </span><span class="n">new_status</span><span class="p">,</span><span class="w"> </span><span class="n">performed_at</span><span class="p">)</span>
+<span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">audit_log_entity</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span><span class="n">entity_type</span><span class="p">,</span><span class="w"> </span><span class="n">entity_id</span><span class="p">,</span><span class="w"> </span><span class="n">performed_at</span><span class="w"> </span><span class="k">DESC</span><span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">audit_log_actor</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span><span class="n">performed_by</span><span class="p">,</span><span class="w"> </span><span class="n">performed_at</span><span class="w"> </span><span class="k">DESC</span><span class="p">);</span>
+</pre></div>
+<p>The <code>detail</code> column carries whatever the retention strategy dictates: full model snapshots, selected fields, or nothing. The schema does not change between strategies; only what you put in <code>detail</code> does.</p>
+<p>The two indexes cover the two most common query shapes: the full history of a specific entity, and the activity of a specific actor. Add further indexes as query patterns become clear in production.</p>
+<h2>Querying the Log</h2>
+<p>An append-only log is only useful if you can read it.</p>
+<p><strong>Full history of a single entity:</strong></p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span>
+<span class="w">    </span><span class="n">action</span><span class="p">,</span>
+<span class="w">    </span><span class="n">old_status</span><span class="p">,</span>
+<span class="w">    </span><span class="n">new_status</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_by</span><span class="p">,</span>
+<span class="w">    </span><span class="n">performed_at</span><span class="p">,</span>
+<span class="w">    </span><span class="n">detail</span>
+<span class="k">FROM</span><span class="w">  </span><span class="n">audit_log</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">entity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;kyc_check&#39;</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">entity_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;9f4e2b1a&#39;</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">performed_at</span><span class="w"> </span><span class="k">ASC</span><span class="p">;</span>
+</pre></div>
+<p><strong>Activity by actor over a period:</strong></p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span>
+<span class="w">    </span><span class="n">performed_by</span><span class="p">,</span>
+<span class="w">    </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w">                                    </span><span class="k">AS</span><span class="w"> </span><span class="n">total_actions</span><span class="p">,</span>
+<span class="w">    </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;approved&#39;</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">approvals</span><span class="p">,</span>
+<span class="w">    </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span><span class="k">WHERE</span><span class="w"> </span><span class="n">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;rejected&#39;</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">rejections</span>
+<span class="k">FROM</span><span class="w">  </span><span class="n">audit_log</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">performed_at</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">NOW</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">INTERVAL</span><span class="w"> </span><span class="s1">&#39;7 days&#39;</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">performed_by</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">total_actions</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</pre></div>
+<p><strong>Items that skipped a required step</strong> (KYC checks approved without passing through <code>processing</code>):</p>
+<div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="k">DISTINCT</span><span class="w"> </span><span class="n">entity_id</span>
+<span class="k">FROM</span><span class="w">   </span><span class="n">audit_log</span>
+<span class="k">WHERE</span><span class="w">  </span><span class="n">entity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;kyc_check&#39;</span>
+<span class="w">  </span><span class="k">AND</span><span class="w">  </span><span class="n">new_status</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;approved&#39;</span>
+<span class="w">  </span><span class="k">AND</span><span class="w">  </span><span class="n">entity_id</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span>
+<span class="w">      </span><span class="k">SELECT</span><span class="w"> </span><span class="n">entity_id</span>
+<span class="w">      </span><span class="k">FROM</span><span class="w">   </span><span class="n">audit_log</span>
+<span class="w">      </span><span class="k">WHERE</span><span class="w">  </span><span class="n">entity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;kyc_check&#39;</span>
+<span class="w">        </span><span class="k">AND</span><span class="w">  </span><span class="n">new_status</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;processing&#39;</span>
+<span class="w">  </span><span class="p">);</span>
+</pre></div>
+<h2>Compliance and Retention</h2>
+<p>Keeping the audit log in the same database as your business data has a practical advantage: compliance queries are joins, not cross-system correlations. Finding all approved KYC checks where the customer account is now suspended is a single <code>JOIN</code>. That is not always possible, and a dedicated audit system is a legitimate choice, but the co-location benefit is real.</p>
+<h3>Compliance</h3>
+<p>GDPR introduces a genuine tension: Article 17 gives individuals the right to erasure, but an immutable audit log cannot delete anything. The two obligations conflict when PII is embedded in audit records. The resolution is to keep PII out of the log wherever possible: reference entities by ID, not by name or email. The <code>detail</code> column is the risk area; full model snapshots that include names, addresses, and document numbers embed PII in an immutable record.</p>
+<p>Separate the PII from the audit record at write time, and an erasure request can pseudonymise the customer record without touching the log. The log remains intact, showing that a check was performed and a decision made, without retaining personal details in immutable form. In some jurisdictions this separation is not sufficient, and you will need to consult more widely for advice.</p>
+<h3>Retention</h3>
+<p>Most regulatory frameworks specify minimum retention periods: the FCA expects MiFID transaction records for five years; PCI DSS requires audit logs for at least one year with three months immediately accessible. Know your specific obligations.</p>
+<p>Postgres table partitioning by month keeps the active dataset manageable and makes archiving or dropping old data a single DDL operation rather than a long-running bulk <code>DELETE</code>:</p>
+<div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">audit_log</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="w">    </span><span class="n">performed_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="p">)</span><span class="w"> </span><span class="n">PARTITION</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">RANGE</span><span class="w"> </span><span class="p">(</span><span class="n">performed_at</span><span class="p">);</span>
+
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">audit_log_2026_05</span>
+<span class="w">    </span><span class="n">PARTITION</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="n">audit_log</span>
+<span class="w">    </span><span class="k">FOR</span><span class="w"> </span><span class="k">VALUES</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="p">(</span><span class="s1">&#39;2026-05-01&#39;</span><span class="p">)</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="p">(</span><span class="s1">&#39;2026-06-01&#39;</span><span class="p">);</span>
+</pre></div>
+<p>At end of retention, drop the partition or move it to cold storage. Either way, the operation is instantaneous and does not touch the live table.</p>
+<h2>Summary</h2>
+<p>Audit logging is one of those concerns that feels optional until it isn't. In a regulated industry the requirement is explicit; everywhere else it surfaces as a support ticket you cannot answer, an incident you cannot reconstruct, a customer dispute you cannot resolve.</p>
+<p>The upfront investment is modest: one table, one write per transition, one structural decision about how much to capture. The patterns here keep it out of your business logic. Retrofitting it later, under pressure, into every write path is considerably more expensive, and the result is never quite trustworthy.</p>
+<p>Think about it before you ship. It is much easier to build it in than to wish you had.</p>
+<p>This is part of a series on pragmatic architecture for startups and scaleups.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/idempotency-is-not-optional" rel="prev">
+                    <span class="meta-nav">&larr;</span> Idempotency Is Not Optional
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/fake-it-while-you-make-it" rel="next">
+                    Fake It While You Make It <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Three Rewrites Every Startup Does | The Chris Frequency</title>
+    <link rel="stylesheet" href="https://chrisfrequency.com/assets/style.css">
+    <link rel="icon" href="https://chrisfrequency.com/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="https://chrisfrequency.com/favicon.svg">
+    <link rel="alternate" type="application/rss+xml" title="The Chris Frequency" href="https://chrisfrequency.com/rss.xml">
+    <link rel="canonical" href="https://chrisfrequency.com/posts/three-rewrites-every-startup-does">
+</head>
+<body>
+    <div class="container">
+        <header class="site-header">
+            <a href="https://chrisfrequency.com/" class="site-title">📡 The Chris Frequency</a>
+            <nav>
+                <a href="https://chrisfrequency.com/" class="">Home</a>
+                <a href="https://chrisfrequency.com/about" class="">About</a>
+            </nav>
+        </header>
+
+        <main>
+            
+<article class="post">
+    
+    
+    <nav class="post-navigation post-navigation-top">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/fake-it-while-you-make-it" rel="prev">
+                    <span class="meta-nav">&larr;</span> Fake It While You Make It
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/asymmetric-architecture" rel="next">
+                    Asymmetric Architecture <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    <header class="post-header">
+        <h1>The Three Rewrites Every Startup Does</h1>
+        <p class="post-meta">
+            <time datetime="2026-03-19">
+                March 19, 2026
+            </time>
+        </p>
+    </header>
+
+    <div class="post-content">
+        <p>Most engineering teams rewrite their systems three times. The first is largely unavoidable. The second is potentially avoidable. The third is self-inflicted, and it is the one that kills velocity.</p>
+<p>The pattern is consistent enough that you can use it as a diagnostic. If a team is about to start a rewrite, the first question worth asking is: which one is this? The answer changes what you should actually do.</p>
+<h2>Rewrite 1: The Domain Rewrite</h2>
+<p>The first rewrite happens when the team discovers they were building the wrong thing.</p>
+<p>Not wrong in the sense of building a product nobody wants; that is a different problem. Wrong in the sense that the data model encoded assumptions about the domain that turned out to be false. The <code>Order</code> model assumed one address per customer; now there are multiple. The <code>User</code> model assumed a single account type; now there are three. The state machine was a boolean; now it has seven states.</p>
+<p>This rewrite is the tuition fee for learning the domain. It is not a failure of engineering; it is evidence that the team shipped fast enough to discover what they were actually building. The only way to avoid it entirely is to understand the domain before writing a line of code, which is typically not possible for genuinely novel products.</p>
+<p>The damage is bounded if the codebase is small and the data model is reasonably isolated. It becomes expensive when:</p>
+<ul>
+<li><strong>The domain model leaked into the database schema</strong> in ways that are hard to migrate</li>
+<li><strong>The business logic is entangled with the storage layer</strong>, so changing one means changing both</li>
+<li><strong>The team kept building on top of the wrong model</strong> rather than correcting it early</li>
+</ul>
+<p>The third point is the important one. Rewrite 1 becomes expensive not because it happens, but because it is delayed. Every week of building on a wrong model is a week of technical debt that compounds. The teams that navigate it well are the ones that course-correct as soon as the model is clearly wrong, not the ones that defer it until the next funding round.</p>
+<p>The best mitigation is not to avoid rewrite 1. It is to design so that when it comes, it is a data model change, not an architectural one.</p>
+<h2>Rewrite 2: The Architecture Rewrite</h2>
+<p>The second rewrite happens when the system's structure makes it impossible to evolve without touching everything.</p>
+<p>The symptoms are recognisable. Adding a new client requires duplicating infrastructure. Changing the storage backend for one part of the system means touching application code everywhere. A schema migration that should take a day takes a month because the database is accessed from forty different places with no consistent abstraction. The system has grown, but it has grown as a tangle rather than a structure.</p>
+<p>This is the expensive rewrite. Not expensive in the sense of taking a long time (though it does); expensive in the sense that it happens at the worst possible moment. By the time the symptoms are undeniable, the team is under commercial pressure, the codebase is large, and the cost of the rewrite is compounded by the cost of maintaining the old system while the new one is built because angry clients are bombarding the product team.</p>
+<p><a href="/posts/defer-the-database-not-the-design">A previous article in this series</a> describes a concrete case: a system built without a clean data layer that could not be migrated to a multi-tenanted architecture, because storage was inseparable from application logic. The team duplicated the entire infrastructure stack per client instead. The operational cost ran to millions of dollars per year more than a properly abstracted system would have required.</p>
+<p>The cause is almost always the same: storage and application logic were not kept separate from the start. The ORM leaked into business logic. Queries were written inline. The database schema became the domain model. When the architecture needs to change, there is no seam to cut along.</p>
+<p><strong>Rewrite 2 is optional.</strong> A <a href="/posts/how-to-build-a-data-access-layer">clean data layer</a> from day one creates the seam. When a storage backend needs to change, you write a new provider implementation. The application code does not move. The rewrite becomes a targeted swap behind an interface rather than a systemic untangling.</p>
+<p>This is not a large investment. A data layer is a few interfaces and a dependency injection pattern. The cost is a few days of upfront structure. The saving is rewrite 2 never happening.</p>
+<h2>Rewrite 3: The Complexity Rewrite</h2>
+<p>The third rewrite is the one that looks like progress.</p>
+<p>The team has hit real scaling constraints, or believes it has. The decision is made to move to microservices, or to adopt an event-driven architecture, or to introduce a message broker. The reasoning feels sound: the system is under load, distributed systems handle load, therefore the system should be distributed.</p>
+<p>Two years later, the system is harder to understand than it was before. Deployments are coordination exercises. Debugging requires correlating logs across eight services. A feature that would have been a function call is now a choreography of events across a queue. New engineers take months to become productive. The team is spending more time on infrastructure than on the business problem.</p>
+<p>This is rewrite 3: adopting complexity that was not warranted by the actual constraints, and then living with the consequences.</p>
+<p>The <a href="/posts/simplicity-scales">Spark migration described in this series</a> is a version of this: a batch processing system migrated to a distributed compute framework to handle scale that had not yet arrived, and then retrofitted for a streaming requirement that the framework handled awkwardly. The engineering cost ran to low millions over the life of the system. The lesson was not that Spark was wrong in principle; it was that the decision was made for hypothetical scale rather than real constraints.</p>
+<p>Microservices have the same failure mode at the architectural level. The cases where distribution genuinely helps are real but specific: services with meaningfully different scaling profiles, teams that need independent deployment, compute that is genuinely too heavy to run in-process. Outside those cases, distribution adds coordination overhead without adding capability. The monolith that was &quot;too slow&quot; is usually not slow because it is a monolith. It is slow because of a handful of specific bottlenecks that could be addressed without distributing state.</p>
+<p><strong>The irony of rewrite 3 is that it is often triggered by rewrite 2 not having happened.</strong> The system is a tangle. Adding the data layer now feels too risky; the coupling is everywhere. The path of least resistance is to extract the messy parts into services instead, hoping that a service boundary will provide the separation that good internal structure would have provided. It does not. What it provides is a distributed tangle, which is strictly harder to reason about than the original.</p>
+<h2>The Relationship Between Them</h2>
+<p>Rewrite 1 is paid for by discovery. It is a reasonable cost.</p>
+<p>Rewrite 2 is paid for by a missing abstraction. It is an avoidable cost.</p>
+<p>Rewrite 3 is paid for by the belief that complexity is a solution to a problem that was actually a missing abstraction. It is a compounding cost.</p>
+<p>Teams that do rewrite 3 have usually skipped or deferred the work that would have made rewrite 2 unnecessary. The coupling that should have been addressed with a data layer is addressed instead with a service boundary, which moves the coupling rather than resolving it. The service boundary introduces distributed systems problems that did not previously exist. The team now has to solve both the original coupling problem and the distributed coordination problem.</p>
+<p>The rewrite that was avoided was one sprint. The rewrite that replaced it is six months, a degraded system in the interim, and a hiring constraint because the specialist knowledge required is now deeper.</p>
+<h2>What To Do Instead</h2>
+<p>The objective is to do rewrite 1 cheaply, avoid rewrite 2 entirely, and never reach rewrite 3.</p>
+<p><strong>For rewrite 1:</strong> keep the domain model separate from the storage layer from day one. When the model turns out to be wrong (and it will), the change is bounded. The storage layer implements the new model; the application code uses the new types. No ORM annotations to migrate, no inline queries to update, no framework magic to unpick.</p>
+<p><strong>For rewrite 2:</strong> build a <a href="/posts/how-to-build-a-data-access-layer">data layer</a> before you need one. This is not premature optimisation; it is the minimum structure that keeps the exit routes open. When a touchpoint outgrows its backend, you write a new provider. When a schema changes, you change the provider; the engineering effort happens &quot;under the hood&quot;. The application does not move.</p>
+<p><strong>For rewrite 3:</strong> earn distribution before adopting it. The bar is concrete: a component needs independent deployment, or its resource profile is genuinely incompatible with the core, or a team boundary requires a service boundary. Not &quot;this might scale better&quot; or &quot;the job posting mentioned Kafka&quot;. When those concrete conditions are met, the <a href="/posts/strategic-monolith-satellites">strategic monolith with satellites</a> gives you the topology to add distribution precisely, at the right boundary, without spreading state.</p>
+<p>The teams that avoid rewrites 2 and 3 are not the ones that planned more carefully or hired more senior engineers. They are the ones that kept the structure simple early, built the right abstractions before they were needed under pressure, and resisted the pull towards complexity before the constraints were real.</p>
+<h2>Summary</h2>
+<p>Three rewrites. One is learning. One is a missing abstraction. One is the wrong solution to the missing abstraction.</p>
+<p>The first is the cost of discovery: largely unavoidable, bounded if the domain model is kept separate from storage.</p>
+<p>The second is the cost of coupling: avoidable with a clean data layer from day one.</p>
+<p>The third is the cost of mistaking distribution for a solution to coupling: entirely self-inflicted, and considerably more expensive than the problem it was meant to solve.</p>
+<p>The goal is not to build the perfect system first. It is to build a system that can absorb the changes that discovery demands, without requiring a rewrite every time the constraints shift.</p>
+
+    </div>
+
+    
+    
+    <nav class="post-navigation post-navigation-bottom">
+        <div class="nav-previous">
+            
+                <a href="https://chrisfrequency.com/posts/fake-it-while-you-make-it" rel="prev">
+                    <span class="meta-nav">&larr;</span> Fake It While You Make It
+                </a>
+            
+        </div>
+        <div class="nav-next">
+            
+                <a href="https://chrisfrequency.com/posts/asymmetric-architecture" rel="next">
+                    Asymmetric Architecture <span class="meta-nav">&rarr;</span>
+                </a>
+            
+        </div>
+    </nav>
+    
+
+
+    
+    <hr class="collaborator-divider">
+    <div class="post-credits">
+        <span class="collaborator-prefix">🤝</span>
+        <em>Co-created with: </em>
+        <span class="collaborator-name">Claude</span>
+    </div>
+    
+</article>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>&copy; 2026 Chris Leow | <a href="https://chrisfrequency.com/rss.xml" title="RSS Feed" class="rss-link"><img src="https://chrisfrequency.com/assets/rss_icon.svg" alt="RSS Feed" class="rss-icon"></a></p>
+        </footer>
+    </div>
+</body>
+</html>
